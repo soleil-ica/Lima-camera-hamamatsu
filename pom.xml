@@ -22,11 +22,11 @@
 			<artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
 			<version>1.3.0</version>
 		</dependency>
-<!--        <dependency>
+         <dependency>
             <groupId>com.hamamatsu</groupId>
             <artifactId>dcamapi-${aol}-shared-${mode}</artifactId>
-			<version>3.10</version>
-        </dependency>            -->
+			<version>13.10</version>
+        </dependency>         
 	</dependencies>
 
 	<build>
@@ -50,27 +50,15 @@
 							<define>NDEBUG</define>
 							<define>_WINDOWS</define>
 							<define>_USRDLL</define>
-							<define>_WIN32_WINNT=0x0502</define>  For Windows XP Support 
+							<define>_WIN32_WINNT=0x0502</define>  <!-- For Windows XP Support -->
 						</defines>
 
-						<systemIncludePaths>
-							<systemIncludePath>C:/DEV_ROOT/2013-08/inc</systemIncludePath>
-						</systemIncludePaths>
 					</cpp>
 					<libraries>
 						<library>
 							<type>shared</type>
 						</library>
 					</libraries>
-					<linker>
-						<libs>
-							<lib>
-								<name>dcamapi</name>
-								<type>shared</type>
-								<directory>C:/DEV_ROOT/2013-08/lib/win32/</directory>
-							</lib>
-						</libs>
-					</linker>
 				</configuration>
 			</plugin>
 		</plugins>
