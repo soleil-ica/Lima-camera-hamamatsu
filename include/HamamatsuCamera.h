@@ -40,6 +40,7 @@
 #include <limits>
 #include "HwMaxImageSizeCallback.h"
 #include "HwBufferMgr.h"
+#include "ThreadUtils.h"
 
 #include <ostream>
 
@@ -47,6 +48,7 @@ using namespace std;
 
 #define C_ORCA_PIXELSIZE	   6.5e-6	
 #define DCAM_STRMSG_SIZE	   256
+#define DCAM_FRAMEBUFFER_SIZE  10
 #define DCAM_TRIGMODE_UNKNOWN -1
 #define HANDLE_DCAMERROR(__camHandle__, __userMsg__) { \
 					     				string __errMsg__;\
@@ -123,7 +125,7 @@ namespace lima
 
 	    void getPixelSize(double& sizex, double& sizey);
     
-	    void getStatus(Camera::Status& status);
+	    Camera::Status getStatus();
     
 	    void reset();
 
@@ -138,10 +140,39 @@ namespace lima
 		void getFPS(double& fps);							///< [out] last computed fps
    
 	private:
-	    class _AcqThread;
-	    friend class _AcqThread;
-	    void _stopAcq(bool);
-	    void _setStatus(Camera::Status status,bool force);
+		class CameraThread: public CmdThread
+		{
+			DEB_CLASS_NAMESPC(DebModCamera, "CameraThread", "Hamamatsu");
+		public:
+			enum
+			{ // Status
+				Ready = MaxThreadStatus, Exposure, Readout, Latency,
+			};
+
+			enum
+			{ // Cmd
+				StartAcq = MaxThreadCmd, StopAcq,
+			};
+
+			CameraThread(Camera& cam);
+
+			virtual void start();
+
+			volatile bool m_force_stop;
+
+		protected:
+			virtual void init();
+			virtual void execCmd(int cmd);
+		private:
+			void execStartAcq();
+			bool copyFrames(const int iFrameBegin,			///< [in] index of the frame where to begin copy
+							const int iFrameCount,			///< [in] number of frames to copy
+							StdBufferCbMgr& buffer_mgr );	///< [in] buffer manager object
+
+			Camera* m_cam;
+
+		};
+		friend class CameraThread;
 
 		//-----------------------------------------------------------------------------
 		// DCAM-SDK Helper
@@ -183,21 +214,10 @@ namespace lima
 		vector<int>					 m_vectBinnings; /// list of available binning modes
 		
 		//-----------------------------------------------------------------------------
-
-
-	    //- acquisition thread stuff    
-	    _AcqThread*                 m_acq_thread;
-	    Cond                        m_cond;
-		bool						m_bAbortCapture;
-		Mutex						m_abortLock;
-
 	    //- lima stuff
 	    SoftBufferCtrlObj	        m_buffer_ctrl_obj;
 	    int                         m_nb_frames;    
 	    Camera::Status              m_status;
-	    volatile bool               m_wait_flag;
-	    volatile bool               m_quit;
-	    volatile bool               m_thread_running;
 	    int                         m_image_number;
 	    int                         m_timeout;
 	    double                      m_latency_time;
@@ -233,7 +253,8 @@ namespace lima
 	    double                      m_exp_time;
 	    double                      m_exp_time_max;
 
-
+		CameraThread 				m_thread;
+		Mutex						m_mutexForceStop;
 	};
     } // namespace Hamamatsu
 } // namespace lima

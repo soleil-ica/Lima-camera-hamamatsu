@@ -35,35 +35,360 @@ using namespace std;
 //-----------------------------------------------------------------------------
 /// utility thread
 //-----------------------------------------------------------------------------
-
-class Camera::_AcqThread : public Thread
+//---------------------------------------------------------------------------------------
+//! Camera::CameraThread::CameraThread()
+//---------------------------------------------------------------------------------------
+Camera::CameraThread::CameraThread(Camera& cam)
+: m_cam(&cam)
 {
-    DEB_CLASS_NAMESPC(DebModCamera, "Camera", "_AcqThread");
-public:
-    _AcqThread(Camera &aCam);
-    virtual ~_AcqThread();
-    
-protected:
-    virtual void threadFunction();
-    
-private:
-	bool copyFrames(const int iFrameBegin,			///< [in] index of the frame where to begin copy
-					const int iFrameEnd,			///< [in] index of the frame where to end copy
-					 StdBufferCbMgr& buffer_mgr );	///< [in] buffer manager object
+	DEB_MEMBER_FUNCT();
+	DEB_TRACE() << "CameraThread::CameraThread - BEGIN";
+	m_force_stop = false;
+	DEB_TRACE() << "CameraThread::CameraThread - END";
+}
+
+//---------------------------------------------------------------------------------------
+//! Camera::CameraThread::start()
+//---------------------------------------------------------------------------------------
+void Camera::CameraThread::start()
+{
+	DEB_MEMBER_FUNCT();
+	DEB_TRACE() << "CameraThread::start - BEGIN";
+	CmdThread::start();
+	waitStatus(Ready);
+	DEB_TRACE() << "CameraThread::start - END";
+}
+
+//---------------------------------------------------------------------------------------
+//! Camera::CameraThread::init()
+//---------------------------------------------------------------------------------------
+void Camera::CameraThread::init()
+{
+	DEB_MEMBER_FUNCT();
+	DEB_TRACE() << "CameraThread::init - BEGIN";
+	setStatus(Ready);
+	DEB_TRACE() << "CameraThread::init - END";
+}
+
+//---------------------------------------------------------------------------------------
+//! Camera::CameraThread::execCmd()
+//---------------------------------------------------------------------------------------
+void Camera::CameraThread::execCmd(int cmd)
+{
+	DEB_MEMBER_FUNCT();
+	DEB_TRACE() << "CameraThread::execCmd - BEGIN";
+	int status = getStatus();
+	switch (cmd)
+	{
+		case StartAcq:
+			if (status != Ready)
+				throw LIMA_HW_EXC(InvalidValue, "Not Ready to StartAcq");
+			execStartAcq();
+			break;
+	}
+	DEB_TRACE() << "CameraThread::execCmd - END";
+}
+
+//---------------------------------------------------------------------------------------
+//! Camera::CameraThread::execStartAcq()
+//---------------------------------------------------------------------------------------
+void Camera::CameraThread::execStartAcq()
+{
+	DEB_MEMBER_FUNCT();
+
+	DEB_TRACE() << "CameraThread::execStartAcq - BEGIN";
+	setStatus(Exposure);
+
+	StdBufferCbMgr& buffer_mgr = m_cam->m_buffer_ctrl_obj.getBuffer();
+	buffer_mgr.setStartTimestamp(Timestamp::now());
+
+    DEB_TRACE() << "Run";
+
+    bool continueAcq = true;
+
+	Timestamp T0, T1, DeltaT;
+
+	_DWORD	status;
+	// Check the status and stop capturing if capturing is already started.
+	if (!dcam_getstatus( m_cam->m_camera_handle, &status ))
+	{
+		HANDLE_DCAMERROR(m_cam->m_camera_handle, "Cannot get status");
+	}
+
+	if (DCAM_STATUS_READY != status) // After allocframe, the camera status should be READY
+	{
+		DEB_ERROR() << "Camera could not be set in the proper state for image capture";
+		THROW_HW_ERROR(Error) << "Camera could not be set in the proper state for image capture";
+	}
+
+	// Start the real capture (this function returns immediately)
+	if (!dcam_capture(m_cam->m_camera_handle))
+	{
+		HANDLE_DCAMERROR(m_cam->m_camera_handle, "Frame capture failed");
+	}
+
+	// Transfer the images as they are beeing captured from dcam_sdk buffer to Lima
+	m_cam->m_lostFramesCount = 0;
+	int32 lastFrameCount = 0, frameCount = 0, lastFrameIndex = -1, frameIndex = 0;
 	
-	bool			m_bAbortAcquisition;
-    Camera&			m_cam;
-};
+	// Main acquisition loop
+    while (		( continueAcq )
+			&&  ( (0==m_cam->m_nb_frames) || (m_cam->m_image_number < m_cam->m_nb_frames) )
+		  )
+    {
+		// Timestamp before DCAM "snapshot"
+		T0 = Timestamp::now();
+
+		// Check first if acq. has been stopped
+		if (m_force_stop)
+			goto ForceTheStop;
+
+		// Wait for the next image to become available or the end of the capture by user
+		_DWORD  waitEventMask = DCAM_EVENT_FRAMEEND | DCAM_EVENT_CAPTUREEND;
+		if (!dcam_wait( m_cam->m_camera_handle, &waitEventMask, DCAM_WAIT_INFINITE, NULL ) )
+		{
+			string strErr;
+			int err = getLastErrorMsg(m_cam->m_camera_handle, strErr);
+
+			// If capture was aborted (by stopAcq() -> dcam_idle())
+			if (DCAMERR_ABORT == err)
+			{
+				DEB_TRACE() << "DCAMERR_ABORT";
+				continueAcq = false;
+			}
+			else 
+			{					
+				HANDLE_DCAMERROR(m_cam->m_camera_handle, "dcam_wait() failed.")
+				setStatus(Fault);
+			}
+		}
+		else
+		{
+			if (DCAM_EVENT_CAPTUREEND & waitEventMask)
+			{
+				DEB_TRACE() << "DCAM_EVENT_CAPTUREEND";
+				continueAcq = false;
+				continue;
+			}
+
+			// check DCAM error code
+			long err = dcam_getlasterror( m_cam->m_camera_handle );
+			switch (err)
+			{
+				case DCAMERR_ABORT:
+				{
+					DEB_TRACE() << "DCAMERR_ABORT";					
+					continueAcq = false;
+					continue;
+				}
+				break;
+
+				case DCAMERR_TIMEOUT:
+				{
+					DEB_TRACE() << "DCAMERR_TIMEOUT";
+					setStatus(Fault);
+					continueAcq = false;
+					THROW_HW_ERROR(Error) << "DCAMERR_TIMEOUT";
+				}
+				break;
+
+				case DCAMERR_LOSTFRAME:
+				case DCAMERR_MISSINGFRAME_TROUBLE:
+				{
+					DEB_TRACE() << "DCAMERR_LOSTFRAME || DCAMERR_MISSINGFRAME_TROUBLE";
+					++m_cam->m_lostFramesCount;
+					continue;
+				}
+
+				// no specific management for other cases
+			}
+		}
+
+ForceTheStop:
+		if (m_force_stop)
+		{
+			//abort the current acqusition
+			continueAcq = false;
+			m_force_stop = false;
+			break;
+		}
+
+		// Transfert the new images
+		setStatus(Readout);
+		
+		int32 deltaFrames = 0;
+		if (dcam_gettransferinfo( m_cam->m_camera_handle, &frameIndex, &frameCount ))
+		{
+			deltaFrames = frameCount-lastFrameCount;
+			DEB_TRACE() << "m_image_number > " << m_cam->m_image_number;
+			DEB_TRACE() << "lastFrameIndex > " << lastFrameIndex;
+			DEB_TRACE() << "frameIndex     > " << frameIndex;
+			DEB_TRACE() << "frameCount     > " << frameCount << " (delta: " << deltaFrames << ")";
+
+			if (0 == frameCount)
+			{
+				setStatus(Fault);
+				DEB_ERROR() << "No image captured.";
+				THROW_HW_ERROR(Error) << "No image captured.";
+			}
+			if (deltaFrames > DCAM_FRAMEBUFFER_SIZE)
+			{
+				m_cam->m_lostFramesCount += deltaFrames;
+				DEB_TRACE() << "deltaFrames > DCAM_FRAMEBUFFER_SIZE (" << deltaFrames << ")";
+			}
+			lastFrameCount = frameCount;
+		}
+		else
+		{
+			setStatus(Fault);
+			HANDLE_DCAMERROR(m_cam->m_camera_handle, "Cannot get transfer info. (dcam_gettransferinfo())");
+		}
+
+		// Check if acquisition was stopped & abort the current acqusition
+		if (m_force_stop)
+		{
+			continueAcq = false;
+			m_force_stop = false;
+			break;
+		}
+
+		/////////////////////////
+		m_cam->m_mutexForceStop.lock();
+		/////////////////////////
+
+		// Copy frames from DCAM_SDK to LiMa
+		int nbFrameToCopy = (deltaFrames < DCAM_FRAMEBUFFER_SIZE)?deltaFrames:DCAM_FRAMEBUFFER_SIZE; // if more than DCAM_FRAMEBUFFER_SIZE have arrived   
+		continueAcq = copyFrames( (lastFrameIndex+1)% DCAM_FRAMEBUFFER_SIZE,						 // index of the first image to copy from the ring buffer
+								   nbFrameToCopy,
+								   buffer_mgr );
+		lastFrameIndex = frameIndex;
+
+		/////////////////////////
+		m_cam->m_mutexForceStop.unlock();
+		/////////////////////////		
+		
+		// Update fps
+		{
+			T1 = Timestamp::now();
+
+			DeltaT = T1 - T0;
+			if (DeltaT > 0.0) m_cam->m_fps = 1.0 * nbFrameToCopy / DeltaT;
+		}
+
+    } /* end of acquisition loop */
+
+	/* Stop the acquisition */
+	if (!dcam_idle(m_cam->m_camera_handle))
+	{
+		HANDLE_DCAMERROR(m_cam->m_camera_handle, "Cannot stop acquisition.");
+	}
+
+	// Release the capture frame
+	if (!dcam_freeframe(m_cam->m_camera_handle))
+	{
+		HANDLE_DCAMERROR(m_cam->m_camera_handle, "Unable to free capture frame (dcam_freeframe())");
+	}
+
+	DEB_TRACE() << "Total time (s): " << (Timestamp::now() - T0);
+	DEB_TRACE() << "FPS           : " << int(m_cam->m_image_number / (Timestamp::now() - T0) );
+	DEB_TRACE() << "Lost frames   : " << m_cam->m_lostFramesCount; 
+
+	setStatus(Ready);
+	DEB_TRACE() << "CameraThread::execStartAcq - END";
+}
+
+
+//-----------------------------------------------------------------------------
+// Copy the given frames to the buffer manager
+//-----------------------------------------------------------------------------
+bool Camera::CameraThread::copyFrames(const int iFrameBegin,		///< [in] index of the frame where to begin copy
+							          const int iFrameCount,		///< [in] number of frames to copy
+								      StdBufferCbMgr& buffer_mgr )	///< [in] buffer manager object
+{
+	DEB_MEMBER_FUNCT();
+	
+	DEB_TRACE() << "copyFrames(" << iFrameBegin << ", nb:" << iFrameCount << ")";
+
+	FrameDim frame_dim = buffer_mgr.getFrameDim();
+	Size frame_size    = frame_dim.getSize();
+	int height		   = frame_size.getHeight();
+
+	bool _CopySucess = false;
+	int iFrameIndex = iFrameBegin; // Index of frame in the DCAM cycling buffer
+	for  (int cptFrame = 1; cptFrame <= iFrameCount; cptFrame++)
+	{
+		DEB_TRACE() << "getFrameBufferPtr(" << m_cam->m_image_number << ")";
+		void *dst = buffer_mgr.getFrameBufferPtr(m_cam->m_image_number);
+        	
+		void* src;
+		long int sRowbytes;
+		bool bImageCopied;
+
+		if ( dcam_lockdata( m_cam->m_camera_handle, &src, &sRowbytes, iFrameIndex) )
+		{
+			DEB_TRACE() << "Copy m_image_number > " << m_cam->m_image_number << " (frameIndex: " << iFrameIndex << ")";
+
+			memcpy( dst, src, sRowbytes * height );
+			//X_aligned_memcpy_sse2(dst, src, sRowbytes * height );
+
+			if (dcam_unlockdata(m_cam->m_camera_handle))
+			{
+				bImageCopied = true;
+				DEB_TRACE() << "image #" << m_cam->m_image_number <<" acquired !";
+			}
+			else
+			{
+				HANDLE_DCAMERROR(m_cam->m_camera_handle, "Unable to unlock frame data (dcam_unlockdata())");
+				bImageCopied = false;
+			}
+		}
+		else
+		{
+			HANDLE_DCAMERROR(m_cam->m_camera_handle, "Unable to lock frame data (dcam_lockdata())");
+			bImageCopied = false;
+		}
+
+		if (!bImageCopied)
+		{
+			setStatus(Fault);
+			_CopySucess = false;
+			string strErr = "Cannot get image.";
+			HANDLE_DCAMERROR(m_cam->m_camera_handle, strErr);
+			break;
+		}
+		else
+		{
+			HwFrameInfoType frame_info;
+			frame_info.acq_frame_nb = m_cam->m_image_number;
+
+			_CopySucess = buffer_mgr.newFrameReady(frame_info);
+
+			DEB_TRACE() << DEB_VAR1(_CopySucess);
+
+			if ( (0==m_cam->m_nb_frames) || (m_cam->m_image_number < m_cam->m_nb_frames) )
+			{
+				++m_cam->m_image_number;
+			}
+			else
+			{
+				DEB_TRACE() << "All images captured.";
+				break;
+			}
+		}
+
+		iFrameIndex = (iFrameIndex+1) % DCAM_FRAMEBUFFER_SIZE;
+	}
+
+	return _CopySucess;
+}
 
 
 //-----------------------------------------------------------------------------
 ///  Ctor
 //-----------------------------------------------------------------------------
 Camera::Camera(const std::string& config_path, int camera_number)
-    : m_status(Ready),
-      m_wait_flag(true),
-      m_quit(false),
-      m_thread_running(true),
+    : m_thread(*this),
+      m_status(Ready),
       m_image_number(0),
 	  m_depth(16),
       m_latency_time(0.),
@@ -93,7 +418,7 @@ Camera::Camera(const std::string& config_path, int camera_number)
 		// --- Initialise deeper parameters of the controller                
 		initialiseController();            
 	    	           
-		// --- BIN already set to 1,1 above. @@ Pas Vu?
+		// --- BIN already set to 1,1 above.
 		// --- Hamamatsu sets the ROI by starting coordinates at 1 and not 0 !!!!
 		Size sizeMax;
 		getDetectorImageSize(sizeMax);
@@ -110,14 +435,13 @@ Camera::Camera(const std::string& config_path, int camera_number)
 		setTrigMode(IntTrig);
 	    
 		m_nb_frames = 1;
-	    
+
 		// --- finally start the acq thread
-		m_acq_thread = new _AcqThread(*this);
-		m_acq_thread->start();
+		m_thread.start();
 	}
 	else
 	{
-		HANDLE_DCAMERROR(NULL, "Unable to initialize the camera (Check that the camera is switched ON & check that is no other software is currently using it).");
+		HANDLE_DCAMERROR(NULL, "Unable to initialize the camera (Check if it is switched on or if an other software is currently using it).");
 	}
 }
 
@@ -129,21 +453,10 @@ Camera::~Camera()
 {
     DEB_DESTRUCTOR();
 
-	// Stop capture if still running
-	if(m_status != Camera::Ready)
-	{
-		_stopAcq(false);
-	}
-
-    // Stop and destroy Acq thread
-	m_quit = true;
-	m_cond.broadcast();
-    delete m_acq_thread;
-    m_acq_thread = NULL;
-
-	DEB_TRACE() << "Thread terminated";
-                
+	stopAcq();
+               
     // Close camera
+	DEB_TRACE() << "Shutdown camera";
 	if (NULL != m_camera_handle)
 	{
 		DEB_TRACE() << "dcam_close()";
@@ -158,9 +471,7 @@ Camera::~Camera()
 		{
 			HANDLE_DCAMERROR(m_camera_handle, "dcam_close() failed !");
 		}		
-	}
-   
-    DEB_TRACE() << "Shutdown camera";	    
+	}    
 }
 
 
@@ -175,6 +486,28 @@ void Camera::prepareAcq()
 	{
 		HANDLE_DCAMERROR(m_camera_handle, "Can not prepare the camera for image capturing. (dcam_precapture())");
 	}
+
+	// Allocate frames to capture
+	if (!dcam_allocframe( m_camera_handle, DCAM_FRAMEBUFFER_SIZE)) 
+	{
+		HANDLE_DCAMERROR(m_camera_handle, "Cannot allocate frame for capturing (dcam_allocframe()).");
+	}
+
+	// Check the number of allocated frames
+	int32 Count = 0;
+	if ( !dcam_getframecount(m_camera_handle, &Count) )
+	{
+		HANDLE_DCAMERROR(m_camera_handle, "Could not get the number of allocated frames. (dcam_getframecount())");
+	}
+	else
+	{
+		DEB_TRACE() << "Allocated frames: " << Count;
+		if (Count != DCAM_FRAMEBUFFER_SIZE) 
+		{
+			DEB_ERROR() << "Only " << Count << " frames could be allocated";
+			THROW_HW_ERROR(Error) << "Only " << Count << " frames could be allocated";
+		}
+	}
 }
 
 
@@ -187,8 +520,6 @@ void Camera::startAcq()
     m_image_number = 0;
 	m_fps = 0;
 
-    m_bAbortCapture=false;
-
     // --- check first the acquisition is idle
 	_DWORD	status;
 
@@ -198,22 +529,18 @@ void Camera::startAcq()
 		HANDLE_DCAMERROR(m_camera_handle, "Cannot get camera status.");
 	}
 	
-	if (status != DCAM_STATUS_STABLE) // STABLE is the state obtained after precapture()
+	if (status != DCAM_STATUS_READY) // STABLE is the state obtained after precapture()
     {
-        _setStatus(Camera::Fault, false);
-		DEB_ERROR() << "Cannot start acquisition, camera is not idle";
-        THROW_HW_ERROR(Error) << "Cannot start acquisition, camera is not idle";
+		DEB_ERROR() << "Cannot start acquisition, camera is not ready";
+        THROW_HW_ERROR(Error) << "Cannot start acquisition, camera is not ready";
     }   
 
     // Wait running state of acquisition thread
-    AutoMutex aLock(m_cond.mutex());
-    m_wait_flag = false;
-    m_cond.broadcast();
-    while(!m_thread_running)
-        m_cond.wait();
+	m_thread.m_force_stop = false;
+
+	m_thread.sendCmd(CameraThread::StartAcq);
+	m_thread.waitNotStatus(CameraThread::Ready);
         
-    StdBufferCbMgr& buffer_mgr = m_buffer_ctrl_obj.getBuffer();
-    buffer_mgr.setStartTimestamp(Timestamp::now());
 }
 
 
@@ -222,426 +549,12 @@ void Camera::startAcq()
 //-----------------------------------------------------------------------------
 void Camera::stopAcq()
 {
-    _stopAcq(false);
-}
+	m_mutexForceStop.lock();
+	m_thread.m_force_stop = true;
+	m_mutexForceStop.unlock();
 
-
-//-----------------------------------------------------------------------------
-/// private method
-//-----------------------------------------------------------------------------
-void Camera::_stopAcq(bool internalFlag)
-{
-    DEB_MEMBER_FUNCT();
-
-	if(m_status != Camera::Ready)
-    {
-		if (!dcam_idle(m_camera_handle))
-		{
-			HANDLE_DCAMERROR(m_camera_handle, "Cannot abort acquisition.");
-		}
-		
-        //Let the acq thread stop the acquisition
-        if (!internalFlag)
-		{
-			m_abortLock.lock();
-			m_bAbortCapture = true;
-			m_abortLock.unlock();
-			return;
-		}
-            
-        // Stop acquisition
-        DEB_TRACE() << "Stop acquisition";
-
-		_setStatus(Camera::Ready, false);
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-/// thread function for acquisition for sequence mode
-/// Version 3: sequence capture with cycling buffer
-//-----------------------------------------------------------------------------
-void Camera::_AcqThread::threadFunction()
-{
-    DEB_MEMBER_FUNCT();
-    AutoMutex aLock(m_cam.m_cond.mutex());
-    StdBufferCbMgr& buffer_mgr = m_cam.m_buffer_ctrl_obj.getBuffer();
-
-    while(!m_cam.m_quit)
-    {
-        while(m_cam.m_wait_flag && !m_cam.m_quit)
-        {
-            DEB_TRACE() << "Wait";
-            m_cam.m_thread_running = false;
-            m_cam.m_cond.broadcast();
-            m_cam.m_cond.wait();
-        }
-
-        DEB_TRACE() << "Run";
-        m_cam.m_thread_running = true;
-        if (m_cam.m_quit) return;
-    
-        m_cam.m_status = Camera::Exposure;
-        m_cam.m_cond.broadcast();
-        aLock.unlock();
-
-        bool continueAcq = true;
-	
-		FrameDim frame_dim = buffer_mgr.getFrameDim();
-		Size frame_size    = frame_dim.getSize();
-
-		Timestamp T0, T1, DeltaT;
-		T0 = Timestamp::now();
-
-		// Set camera to Readout state
-        m_cam._setStatus(Camera::Readout,false);
-
-		// Release the capture frame (in case thread funtion has been exited by "if (m_cam.m_quit) return;"
-		if (!dcam_freeframe( m_cam.m_camera_handle))
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "begin acq: Unable to free capture frame (dcam_freeframe())");
-		}
-
-		// Allocate frames to capture
-		int bufferSize = 10; // capture buffer size
-		if (!dcam_allocframe( m_cam.m_camera_handle, bufferSize)) 
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Cannot allocate frame for capturing (dcam_allocframe()).");
-		}
-
-		// Check the number of allocated frames
-		int32 Count = 0;
-		if ( !dcam_getframecount(m_cam.m_camera_handle, &Count) )
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Could not get the number of allocated frames. (dcam_getframecount())");
-		}
-		else
-		{
-			DEB_TRACE() << "Allocated frames: " << Count;
-			if (Count != bufferSize) 
-			{
-				DEB_ERROR() << "Only " << Count << " frames could be allocated";
-				THROW_HW_ERROR(Error) << "Only " << Count << " frames could be allocated";
-			}
-		}
-
-		_DWORD	status;
-		// Check the status and stop capturing if capturing is already started.
-		if (!dcam_getstatus( m_cam.m_camera_handle, &status ))
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Cannot get status");
-		}
-
-		if (DCAM_STATUS_READY != status) // After allocframe, the camera status should be READY
-		{
-			DEB_ERROR() << "Camera could not be set in the proper state for image capture";
-			THROW_HW_ERROR(Error) << "Camera could not be set in the proper state for image capture";
-		}
-
-		// Start the real capture (this function returns immediately)
-		if (!dcam_capture(m_cam.m_camera_handle))
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Frame capture failed");
-		}
-
-		// Transfer the images as they are beeing captured from dcam_sdk buffer to Lima
-		m_cam.m_lostFramesCount = 0;
-		int32 lastFrameCount = 0, frameCount = 0, lastFrameIndex = -1, frameIndex = 0;
-		
-		// Main acquisition loop
-        while (		( continueAcq )
-				&&  ( (0==m_cam.m_nb_frames) || (m_cam.m_image_number < m_cam.m_nb_frames) )
-			  )
-        {
-			// Check first if acq. has been stopped
-			if (m_cam.m_wait_flag)
-			{
-				continueAcq = false;
-				continue;
-			}
-
-			// Wait for the next image to become available or the end of the capture by user
-			_DWORD  waitEventMask = DCAM_EVENT_FRAMEEND | DCAM_EVENT_CAPTUREEND;
-			if (!dcam_wait( m_cam.m_camera_handle, &waitEventMask, DCAM_WAIT_INFINITE, NULL ) )
-			{
-				string strErr;
-				int err = getLastErrorMsg(m_cam.m_camera_handle, strErr);
-
-				// If capture was aborted (by stopAcq() -> dcam_idle())
-				if (DCAMERR_ABORT == err)
-				{
-					DEB_TRACE() << "DCAMERR_ABORT";
-					continueAcq = false;
-				}
-				else 
-				{					
-					HANDLE_DCAMERROR(m_cam.m_camera_handle, "dcam_wait() failed.")
-					m_cam._stopAcq(true);
-				}
-			}
-			else
-			{
-				if (DCAM_EVENT_CAPTUREEND == waitEventMask)
-				{
-					DEB_TRACE() << "DCAM_EVENT_CAPTUREEND";
-					continueAcq = false;
-					continue;
-				}
-
-				// check DCAM error code
-				long err = dcam_getlasterror( m_cam.m_camera_handle );
-				switch (err)
-				{
-					case DCAMERR_ABORT:
-					{
-						DEB_TRACE() << "DCAMERR_ABORT";					
-						continueAcq = false;
-						continue;
-					}
-
-					case DCAMERR_TIMEOUT:
-					{
-						DEB_TRACE() << "DCAMERR_TIMEOUT";
-						continue;
-					}
-
-					case DCAMERR_LOSTFRAME:
-					case DCAMERR_MISSINGFRAME_TROUBLE:
-					{
-						DEB_TRACE() << "DCAMERR_LOSTFRAME || DCAMERR_MISSINGFRAME_TROUBLE";
-						++m_cam.m_lostFramesCount;
-						continue;
-					}
-
-					// no specific management for other cases
-				}
-			}
-
-
-			// Transfert the new images
-			if (continueAcq && (!m_cam.m_bAbortCapture))
-			{
-			
-				if (dcam_gettransferinfo( m_cam.m_camera_handle, &frameIndex, &frameCount ))
-				{
-					int32 deltaFrames = frameCount-lastFrameCount;
-					DEB_TRACE() << "m_image_number > " << m_cam.m_image_number;
-					DEB_TRACE() << "lastFrameIndex > " << lastFrameIndex;
-					DEB_TRACE() << "frameIndex     > " << frameIndex;
-					DEB_TRACE() << "frameCount     > " << frameCount << " (delta: " << deltaFrames << ")";
-
-					if (0 == frameCount)
-					{
-						m_cam._stopAcq(true);
-						DEB_ERROR() << "No image captured.";
-						THROW_HW_ERROR(Error) << "No image captured.";
-					}
-					if (deltaFrames > bufferSize)
-					{
-						m_cam.m_lostFramesCount += deltaFrames;
-					}
-					lastFrameCount = frameCount;
-				}
-				else
-				{
-					m_cam._stopAcq(true);
-					HANDLE_DCAMERROR(m_cam.m_camera_handle, "Cannot get transfer info. (dcam_gettransferinfo())");
-				}
-
-				// See which frames indexes must be copied from the buffer
-				int part1Begin = 0, part1End = 0;
-				if (frameIndex < lastFrameIndex)	// 2 possible partitions (frameIndex has looped)
-				{
-					part1Begin = (lastFrameIndex+1 == bufferSize)?0:lastFrameIndex+1;  // handle the case where lastFrameIndex was the end of the buffer
-					if (0 == part1Begin)	// only one partition in this case
-					{
-						part1End = frameIndex;
-						continueAcq = copyFrames(part1Begin, part1End, buffer_mgr);
-					}
-					else					// 2 partitions
-					{
-						int part2Begin = 0, part2End;
-						part1End = bufferSize - 1;
-						part2End = frameIndex;
-
-						continueAcq = copyFrames(part1Begin, part1End, buffer_mgr);
-						if ( (0==m_cam.m_nb_frames) || (m_cam.m_image_number < m_cam.m_nb_frames) )
-						{
-							continueAcq = copyFrames(part2Begin, part2End, buffer_mgr);
-						}
-					}
-				}
-				else								// only 1 partition (contiguous images)
-				{
-					if (lastFrameIndex != frameIndex)	// lastFrameIndex == frameIndex can occur when delta is greater than caputure buffer (in this nothing is done)
-					{
-						continueAcq = copyFrames(lastFrameIndex + 1, frameIndex, buffer_mgr);
-					}				
-				}
-
-				lastFrameIndex = frameIndex;
-			}
-
-			// Update fps
-			{
-				T1 = Timestamp::now();
-
-				DeltaT = T1 - T0;
-				m_cam.m_fps = 1.0 * m_cam.m_image_number / DeltaT;
-			}
-        }
-
-		DEB_TRACE() << "exiting threadfunction mainloop";
-
-        m_cam._stopAcq(true);
-
-		// Release the capture frame
-		if (!dcam_freeframe( m_cam.m_camera_handle))
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Unable to free capture frame (dcam_freeframe())");
-		}
-
-
-		DEB_TRACE() << "Total time (s): " << (Timestamp::now() - T0);
-		DEB_TRACE() << "FPS           : " << int(m_cam.m_image_number / (Timestamp::now() - T0) );
-		DEB_TRACE() << "Lost frames   : " << m_cam.m_lostFramesCount;
-
-        aLock.lock();
-        m_cam.m_wait_flag = true;
-    }
-}
-
-
-//-----------------------------------------------------------------------------
-// Copy the given frames to the buffer manager
-//-----------------------------------------------------------------------------
-bool Camera::_AcqThread::copyFrames(const int iFrameBegin,			///< [in] index of the frame where to begin copy
-									const int iFrameEnd,			///< [in] index of the frame where to end copy
-								    StdBufferCbMgr& buffer_mgr )	///< [in] buffer manager object
-{
-	DEB_MEMBER_FUNCT();
-
-	// Check for capture abort
-	m_cam.m_abortLock.lock();
-	if (m_cam.m_bAbortCapture) 
-	{
-		m_cam.m_abortLock.unlock();
-		return true;
-	}
-	m_cam.m_abortLock.unlock();
-
-	DEB_TRACE() << "copyFrames(" << iFrameBegin << ", " << iFrameEnd << ")";
-
-	FrameDim frame_dim = buffer_mgr.getFrameDim();
-	Size frame_size    = frame_dim.getSize();
-	int height		   = frame_size.getHeight();
-
-	DEB_TRACE() << "frame_size.getHeight(): " << frame_size.getHeight();
-
-	bool _CopySucess = false;
-	for  (int iFrame = iFrameBegin; iFrame <= iFrameEnd; iFrame++)
-	{	
-		m_cam.m_abortLock.lock();
-		if (m_cam.m_bAbortCapture) 
-		{
-			m_cam.m_abortLock.unlock();
-			return true;
-		}
-		m_cam.m_abortLock.unlock();
-
-		void *dst = buffer_mgr.getFrameBufferPtr(m_cam.m_image_number);
-        	
-		void* src;
-		long int sRowbytes;
-		bool bImageCopied;
-
-		if ( dcam_lockdata( m_cam.m_camera_handle, &src, &sRowbytes, iFrame) )
-		{
-			DEB_TRACE() << "sRowbytes: "  << sRowbytes;
-			DEB_TRACE() << "Copy m_image_number > " << m_cam.m_image_number << " (frameIndex: " << iFrame << ")";
-
-			memcpy( dst, src, sRowbytes * height );
-			DEB_TRACE() << "memcpy ok";
-
-			if (dcam_unlockdata(m_cam.m_camera_handle))
-			{
-				bImageCopied = true;
-				DEB_TRACE() << "image #" << m_cam.m_image_number <<" acquired !";
-			}
-			else
-			{
-				HANDLE_DCAMERROR(m_cam.m_camera_handle, "Unable to unlock frame data (dcam_unlockdata())");
-				bImageCopied = false;
-			}
-		}
-		else
-		{
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, "Unable to lock frame data (dcam_lockdata())");
-			bImageCopied = false;
-		}
-
-		if (!bImageCopied)
-		{
-			m_cam._setStatus(Camera::Fault,false);
-			_CopySucess = false;
-			string strErr = "Cannot get image.";
-			HANDLE_DCAMERROR(m_cam.m_camera_handle, strErr);
-			break;
-		}
-		else
-		{
-			HwFrameInfoType frame_info;
-			frame_info.acq_frame_nb = m_cam.m_image_number;
-
-			m_cam.m_abortLock.lock();
-			if (m_cam.m_bAbortCapture) 
-			{
-				m_cam.m_abortLock.unlock();
-				return true;
-			}
-			m_cam.m_abortLock.unlock();
-
-			_CopySucess = buffer_mgr.newFrameReady(frame_info);
-
-			DEB_TRACE() << DEB_VAR1(_CopySucess);
-
-			if ( (0==m_cam.m_nb_frames) || (m_cam.m_image_number < m_cam.m_nb_frames) )
-			{
-				++m_cam.m_image_number;
-			}
-			else
-			{
-				DEB_TRACE() << "All images captured.";
-				break;
-			}
-		}
-	}
-
-	return _CopySucess;
-}
-
-
-//-----------------------------------------------------------------------------
-/// the acquisition thread Ctor
-//-----------------------------------------------------------------------------
-Camera::_AcqThread::_AcqThread(Camera &aCam) :
-    m_cam(aCam)
-{
-    pthread_attr_setscope(&m_thread_attr,PTHREAD_SCOPE_PROCESS);
-}
-
-
-//-----------------------------------------------------------------------------
-/// the acquisition thread Dtor
-//-----------------------------------------------------------------------------
-Camera::_AcqThread::~_AcqThread()
-{
-    AutoMutex aLock(m_cam.m_cond.mutex());
-    m_cam.m_quit = true;
-    m_cam.m_cond.broadcast();
-    aLock.unlock();
-    
-    join();
+	m_thread.sendCmd(CameraThread::StopAcq);
+	m_thread.waitStatus(CameraThread::Ready);
 }
 
 
@@ -958,26 +871,31 @@ void Camera::getNbHwAcquiredFrames(int &nb_acq_frames)
 //-----------------------------------------------------------------------------
 /// Get the camera status
 //-----------------------------------------------------------------------------
-void Camera::getStatus(Camera::Status& status) ///< [out] current camera status
+Camera::Status Camera::getStatus() ///< [out] current camera status
 {
-    DEB_MEMBER_FUNCT();
-    AutoMutex aLock(m_cond.mutex());
-    status = m_status;
-    DEB_RETURN() << DEB_VAR1(DEB_HEX(status));
-}
+	DEB_MEMBER_FUNCT();
 
+	int thread_status = m_thread.getStatus();
 
-//-----------------------------------------------------------------------------
-/// Set the new camera status
-//-----------------------------------------------------------------------------
-void Camera::_setStatus(Camera::Status status,	///< [in] new camera status
-						bool force)				///< [in] true to force the status
-{
-    DEB_MEMBER_FUNCT();
-    AutoMutex aLock(m_cond.mutex());
-    if(force || m_status != Camera::Fault)
-        m_status = status;
-    m_cond.broadcast();
+	DEB_RETURN() << DEB_VAR1(thread_status);
+
+	switch (thread_status)
+	{
+		case CameraThread::Ready:
+			return Camera::Ready;
+
+		case CameraThread::Exposure:
+			return Camera::Exposure;
+
+		case CameraThread::Readout:
+			return Camera::Readout;
+
+		case CameraThread::Latency:
+			return Camera::Latency;
+
+		default:
+			throw LIMA_HW_EXC(Error, "Invalid thread status");
+	}
 }
 
 
@@ -1005,45 +923,24 @@ void Camera::setRoi(const Roi& set_roi) ///< [in] New Roi values
     DEB_PARAM() << DEB_VAR1(set_roi);
 
     Point topleft, size;
-    //int binx, biny;
+
     Roi hw_roi, roiMax;
     Size sizeMax;
 
 	Point set_roi_topleft = set_roi.getTopLeft(); 
 	Point set_roi_size    = set_roi.getSize();
-	cout << "setRoi(): " << set_roi_topleft.x << ", " 
+	DEB_TRACE() << "setRoi(): " << set_roi_topleft.x << ", " 
 					     << set_roi_topleft.y << ", " 
 					     << set_roi_size.x    << ", " 
-					     << set_roi_size.y << endl;
+					     << set_roi_size.y;
 
     if (m_roi == set_roi) return;
 
 	if ((0 == set_roi_size.x) && (0 == set_roi_size.y))
 	{
-		cout << "Ignore 0x0 roi" << endl;
+		DEB_TRACE() << "Ignore 0x0 roi";
 		return;
 	}
-
-	/*
-    getDetectorImageSize(sizeMax);
-    roiMax = Roi(0,0, sizeMax.getWidth(), sizeMax.getHeight());
-               
-    if (set_roi.isActive() && (set_roi != roiMax) )
-    {
-		// --- a real roi available
-		DEB_TRACE() << "--- a real roi available";
-		hw_roi = set_roi;
-		binx = m_bin.getX(); biny = m_bin.getY();    	
-    }
-    else
-    {
-		DEB_TRACE() << "---  either No roi or roi fit with max size!!!	";
-		// ---  either No roi or roi fit with max size!!!	
-		// --- in that case binning for full size calculation is 1
-		hw_roi = roiMax;
-		binx=1; biny=1;
-    }    
-	*/
 
 	hw_roi = set_roi;
 
@@ -1055,10 +952,6 @@ void Camera::setRoi(const Roi& set_roi) ///< [in] New Roi values
 		THROW_HW_ERROR(Error) << "Cannot set detector ROI";
 	}
 
-	cout << "calling dcamex_setsubarrayrect(): " << hw_roi_topleft.x << ", " 
-											   << hw_roi_topleft.y << ", " 
-											   << hw_roi_size.x    << ", " 
-											   << hw_roi_size.y << endl;
 	if (!dcamex_setsubarrayrect(m_camera_handle, hw_roi_topleft.x, hw_roi_topleft.y, hw_roi_size.x, hw_roi_size.y))
     {
         HANDLE_DCAMERROR(m_camera_handle, "Cannot set detector ROI.");

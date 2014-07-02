@@ -80,8 +80,6 @@ void Interface::reset(ResetLevel reset_level)
     DEB_PARAM() << DEB_VAR1(reset_level);
 
     stopAcq();
-
-    m_cam._setStatus(Camera::Ready,true);
 }
 
 //-----------------------------------------------------
@@ -119,45 +117,24 @@ void Interface::getStatus(StatusType& status)
     DEB_MEMBER_FUNCT();
     
     Camera::Status Hamamatsu_status = Camera::Ready;
-    m_cam.getStatus(Hamamatsu_status);
+    Hamamatsu_status = m_cam.getStatus();
     switch (Hamamatsu_status)
     {
-		case Camera::Ready:
-		{
-			status.acq = AcqReady;
-			status.det = DetIdle;
-			break;
-		}
-
-		case Camera::Exposure:
-		{
-			status.det = DetExposure;
-			status.acq = AcqRunning;
-			break;
-		}
-		
-		case Camera::Readout:
-		{
-			status.det = DetReadout;
-			status.acq = AcqRunning;
-			break;
-		}
-		
-		case Camera::Latency:
-		{
-			status.det = DetLatency;
-			status.acq = AcqRunning;
-			break;
-		}
-
-		case Camera::Fault:
-		{
-			status.det = DetFault;
-			status.acq = AcqFault;
-			break;
-		}
+    case Camera::Ready:
+      status.set(HwInterface::StatusType::Ready);
+      break;
+    case Camera::Exposure:
+      status.set(HwInterface::StatusType::Exposure);
+      break;
+    case Camera::Readout:
+      status.set(HwInterface::StatusType::Readout);
+      break;
+    case Camera::Latency:
+      status.set(HwInterface::StatusType::Latency);
+      break;
+    case Camera::Fault:
+      status.set(HwInterface::StatusType::Fault);
     }
-    status.det_mask = DetExposure | DetReadout | DetLatency;
     
     DEB_RETURN() << DEB_VAR1(status);
 }
