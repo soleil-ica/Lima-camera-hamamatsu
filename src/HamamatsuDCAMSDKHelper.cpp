@@ -58,12 +58,12 @@ HDCAM Camera::dcam_init_open(long camera_number)	///< [in] id of the camera to o
 			{
 				showCameraInfo(iDevice);
 
-				if (dcam_getmodelinfo( iDevice, DCAM_IDSTR_VENDOR,		buf, sizeof( buf ) ))
+				if (dcam_getmodelinfo( iDevice, DCAM_IDSTR_MODEL,		buf, sizeof( buf ) ))
 				{
 					m_detector_model = buf;
 				}
 
-				if (dcam_getmodelinfo( iDevice, DCAM_IDSTR_MODEL,		buf, sizeof( buf ) ))
+				if (dcam_getmodelinfo( iDevice, DCAM_IDSTR_VENDOR,		buf, sizeof( buf ) ))
 				{
 					m_detector_type = buf;
 				}

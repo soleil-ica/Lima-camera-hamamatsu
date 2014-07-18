@@ -92,6 +92,7 @@ namespace lima
 	    void getDetectorType(std::string& type);
 	    void getDetectorModel(std::string& model);
 	    void getDetectorImageSize(Size& size);
+		void getDetectorMaxImageSize(Size& size);
     
 	    // -- Buffer control object
 	    HwBufferCtrlObj* getBufferCtrlObj();
@@ -236,6 +237,7 @@ namespace lima
 	    string                      m_detector_model;
 	    string                      m_detector_type;
 		long						m_depth, m_bytesPerPixel;
+		long						m_maxImageWidth, m_maxImageHeight;
     
 	    //- Hamamatsu SDK stuff
 	    string                      m_config_path;

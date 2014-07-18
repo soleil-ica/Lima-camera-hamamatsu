@@ -359,17 +359,17 @@ bool Camera::CameraThread::copyFrames(const int iFrameBegin,		///< [in] index of
 		else
 		{
 			HwFrameInfoType frame_info;
-			frame_info.acq_frame_nb = m_cam->m_image_number;
+			frame_info.acq_frame_nb = m_cam->m_image_number;		
 
-			_CopySucess = buffer_mgr.newFrameReady(frame_info);
-
-			DEB_TRACE() << DEB_VAR1(_CopySucess);
-
+			// Make the new frame avalailble
 			if ( (0==m_cam->m_nb_frames) || (m_cam->m_image_number < m_cam->m_nb_frames) )
 			{
+				_CopySucess = buffer_mgr.newFrameReady(frame_info);
 				++m_cam->m_image_number;
 			}
-			else
+
+			// Done capturing (SNAP)
+			if ( (m_cam->m_image_number == m_cam->m_nb_frames) && (0!=m_cam->m_nb_frames))
 			{
 				DEB_TRACE() << "All images captured.";
 				break;
@@ -379,6 +379,7 @@ bool Camera::CameraThread::copyFrames(const int iFrameBegin,		///< [in] index of
 		iFrameIndex = (iFrameIndex+1) % DCAM_FRAMEBUFFER_SIZE;
 	}
 
+	DEB_TRACE() << DEB_VAR1(_CopySucess);
 	return _CopySucess;
 }
 
@@ -416,13 +417,21 @@ Camera::Camera(const std::string& config_path, int camera_number)
 	if (NULL != m_camera_handle)
 	{
 		// --- Initialise deeper parameters of the controller                
-		initialiseController();            
+		initialiseController();
 	    	           
 		// --- BIN already set to 1,1 above.
 		// --- Hamamatsu sets the ROI by starting coordinates at 1 and not 0 !!!!
 		Size sizeMax;
 		getDetectorImageSize(sizeMax);
 		Roi aRoi = Roi(0,0, sizeMax.getWidth(), sizeMax.getHeight());
+
+		// Store max image size
+		m_maxImageWidth  = sizeMax.getWidth();
+		m_maxImageHeight = sizeMax.getHeight();
+
+		// Display max image size
+		DEB_TRACE() << "Detector max width: " << m_maxImageWidth;
+		DEB_TRACE() << "Detector max height:" << m_maxImageHeight;
 	    
 		// --- setRoi applies both bin and roi
 		DEB_TRACE() << "Set the ROI to full frame: "<< aRoi;
@@ -484,7 +493,7 @@ void Camera::prepareAcq()
 
 	if (!dcam_precapture( m_camera_handle, DCAM_CAPTUREMODE_SEQUENCE))
 	{
-		HANDLE_DCAMERROR(m_camera_handle, "Can not prepare the camera for image capturing. (dcam_precapture())");
+		HANDLE_DCAMERROR(m_camera_handle, "Can not prepare the camera for sequence mode capturing. (dcam_precapture())");
 	}
 
 	// Allocate frames to capture
@@ -535,7 +544,7 @@ void Camera::startAcq()
         THROW_HW_ERROR(Error) << "Cannot start acquisition, camera is not ready";
     }   
 
-    // Wait running state of acquisition thread
+	// init force stop flag before starting acq thread
 	m_thread.m_force_stop = false;
 
 	m_thread.sendCmd(CameraThread::StartAcq);
@@ -549,12 +558,26 @@ void Camera::startAcq()
 //-----------------------------------------------------------------------------
 void Camera::stopAcq()
 {
+    DEB_MEMBER_FUNCT();
+
 	m_mutexForceStop.lock();
 	m_thread.m_force_stop = true;
 	m_mutexForceStop.unlock();
 
 	m_thread.sendCmd(CameraThread::StopAcq);
+
+	// Wait for thread to finish
 	m_thread.waitStatus(CameraThread::Ready);
+}
+
+
+//-----------------------------------------------------------------------------
+/// return the detector Max image size 
+//-----------------------------------------------------------------------------
+void Camera::getDetectorMaxImageSize(Size& size) ///< [out] image dimensions
+{
+	DEB_MEMBER_FUNCT();
+	size = Size(m_maxImageWidth, m_maxImageHeight);
 }
 
 
