@@ -411,6 +411,9 @@ Camera::Camera(const std::string& config_path, int camera_number)
 	m_map_triggerMode[ExtGate]		  = "ExtGate";
 	m_map_triggerMode[ExtStartStop]   = "ExtStartStop";
 	m_map_triggerMode[ExtTrigReadout] = "ExtTrigReadout";
+	m_map_triggerMode[ExtTrigSingle]  = "ExtTrigSingle";
+	m_map_triggerMode[ExtTrigMult]    = "ExtTrigMult";
+
 
     // --- Get available cameras and select the choosen one.	
 	m_camera_handle = dcam_init_open(camera_number);
@@ -1151,16 +1154,17 @@ void Camera::initialiseController()
 
 		// Fills the map of available trigger modes
 		/*
-		IntTrig,		x
+		IntTrig,		-> DCAM_TRIGMODE_INTERNAL
 		IntTrigMult,	?
-		ExtTrigSingle,	?
-		ExtTrigMult,	?
+		ExtTrigSingle,	-> DCAM_TRIGMODE_START
+		ExtTrigMult,	-> DCAM_TRIGMODE_EDGE
 		ExtGate,		x
 		ExtStartStop,   x
 		ExtTrigReadout  x
 		*/
 		m_map_trig_modes[IntTrig] = DCAM_TRIGMODE_INTERNAL;
-		if( m_camera_capabilities & DCAM_CAPABILITY_TRIGGER_EDGE )			m_map_trig_modes[ExtTrigSingle] = DCAM_TRIGMODE_EDGE;
+		if ( m_camera_capabilities & DCAM_CAPABILITY_TRIGGER_START ) m_map_trig_modes[ExtTrigSingle] = DCAM_TRIGMODE_START;
+		if ( m_camera_capabilities & DCAM_CAPABILITY_TRIGGER_EDGE )  m_map_trig_modes[ExtTrigMult]   = DCAM_TRIGMODE_EDGE;
 
 		// (TODO: A proposer/valider: ExtGate)
 		// if( m_camera_capabilities & DCAM_CAPABILITY_TRIGGER_LEVEL )			m_map_trig_modes[ExtGate]		= DCAM_TRIGMODE_LEVEL ); 

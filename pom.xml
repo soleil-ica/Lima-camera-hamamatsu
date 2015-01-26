@@ -34,6 +34,12 @@
             <version>13.10</version>
         </dependency>         
         
+    <dependency>
+      <groupId>fr.soleil.lib</groupId>
+      <artifactId>YAT-${aol}-static-${mode}</artifactId>
+      <version>1.9.6-vc9</version>
+    </dependency>
+            
         <dependency>
             <groupId>ncsa.uiuc.edu</groupId>
             <artifactId>HDF5-${aol}-shared-release</artifactId>
