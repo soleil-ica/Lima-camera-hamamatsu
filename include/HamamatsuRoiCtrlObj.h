@@ -23,7 +23,7 @@
 #define HAMAMATSUROICTRLOBJ_H
 
 #include "HamamatsuCompatibility.h"
-#include "HwRoiCtrlObj.h"
+#include "lima/HwRoiCtrlObj.h"
 #include "HamamatsuCamera.h"
 
 namespace lima

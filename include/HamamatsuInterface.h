@@ -22,7 +22,7 @@
 #ifndef HAMAMATSUINTERFACE_H
 #define HAMAMATSUINTERFACE_H
 #include "HamamatsuCompatibility.h"
-#include "HwInterface.h"
+#include "lima/HwInterface.h"
 #include "HamamatsuCamera.h"
 #include "HamamatsuDetInfoCtrlObj.h"
 #include "HamamatsuSyncCtrlObj.h"

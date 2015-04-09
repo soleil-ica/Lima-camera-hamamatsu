@@ -22,7 +22,7 @@
 #ifndef HAMAMATSUSYNCCTRLOBJ_H
 #define HAMAMATSUSYNCCTRLOBJ_H
 
-#include "HwInterface.h"
+#include "lima/HwInterface.h"
 #include "HamamatsuCamera.h"
 
 namespace lima

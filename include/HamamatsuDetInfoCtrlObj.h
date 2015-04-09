@@ -22,7 +22,7 @@
 #ifndef HAMAMATSUDETINFOCTRLOBJ_H
 #define HAMAMATSUDETINFOCTRLOBJ_H
 
-#include "HwDetInfoCtrlObj.h"
+#include "lima/HwDetInfoCtrlObj.h"
 #include "HamamatsuCamera.h"
 
 namespace lima
