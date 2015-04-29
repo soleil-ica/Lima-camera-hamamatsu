@@ -26,7 +26,6 @@
 #include <math.h>
 #include <algorithm>
 #include "HamamatsuCamera.h"
-#include <Timestamp.h>
 
 using namespace lima;
 using namespace lima::Hamamatsu;

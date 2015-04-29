@@ -38,9 +38,10 @@
 
 #include <stdlib.h>
 #include <limits>
-#include "HwMaxImageSizeCallback.h"
-#include "HwBufferMgr.h"
-#include "ThreadUtils.h"
+#include "lima/HwMaxImageSizeCallback.h"
+#include "lima/HwBufferMgr.h"
+#include "lima/ThreadUtils.h"
+#include "lima/Timestamp.h"
 
 #include <ostream>
 
