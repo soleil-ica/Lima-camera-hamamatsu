@@ -1,15 +1,19 @@
-ORCA-Flash4.0 V2 (C11440-22CU V2)
--------
+.. _camera-hamamatsu:
+
+Hamamatsu
+----------
 
 .. image:: orca_flash.png
 
 Introduction
-```````````
+````````````
 The Hamamatsu Orca flash is digital CMOS camera.
 It supports USB3 or direct camera link connectivity.
+
  - USB 3.0    -> 30fps
  - Cameralink -> 100fps
-The Lima plugin controls an Orca camera under Windows.
+
+The Lima plugin controls an Orca camera (**ORCA-Flash4.0 V2, C11440-22CU V2**) under Windows.
 It is based on the Hamamatsu DCAM-API SDK.
 
 Prerequisite
@@ -42,7 +46,9 @@ We only provide here extra information for a better understanding of the capabil
  - Detector type: Scientific CMOS sensor FL-400
 
 * HwSync
-	Supported trigger types are:
+
+ Supported trigger types are:
+
  - IntTrig
  - ExtTrigSingle
  - ExtGate (not yet implemented)
@@ -51,26 +57,33 @@ We only provide here extra information for a better understanding of the capabil
 Optional capabilities
 ........................
 * HwBin
-	Possible binning values are:
+
+ Possible binning values are:
+
  - 1 * 1
  - 2 * 2
  - 4 * 4
 
 * HwRoi
-	The Subarray mode allows defining a rectangle for ROI:
+
+ The Subarray mode allows defining a rectangle for ROI:
+
  - X: 0 to 2044
  - Width:  4 to 2048
  - Y: 0 to 2044
  - Heigth: 4 to 2048
 
 * HwShutter
+
  - There is no shutter control available in the DCAM-API SDK.
 
 * Cooling
+
  - There is no cooler sensor access or control to the cooling system via the DCAM-API SDK.
  - Cooling management is autonomous and can only be chosen between air or water cooling outside the sdk.
  
 * Readout mode
+
  - Two readout modes are available: SLOW (30fps at full frame) or NORMAL (100fps at full frame).
 
 Configuration
