@@ -10,7 +10,7 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaHamamatsu-${aol}-shared-${mode}</artifactId>
-    <version>1.0.6</version>
+    <version>1.0.7</version>
 
     <packaging>nar</packaging>
     <name>LimaHamamatsu</name>
@@ -37,8 +37,8 @@
         
         <dependency>
             <groupId>fr.soleil.lib</groupId>
-            <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
-            <version>3.0.7-vc9</version>
+            <artifactId>NexusCPPV2-${aol}-static-${mode}</artifactId>
+            <version>2.3.3-vc9</version>
         </dependency>
 				
         <dependency>
