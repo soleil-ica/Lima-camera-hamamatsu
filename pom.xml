@@ -26,7 +26,7 @@
         <dependency>
             <groupId>fr.soleil.lib</groupId>
             <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
-            <version>1.6.2-SNAPSHOT</version>
+            <version>1.7.2-SNAPSHOT</version>
         </dependency>
         
         <dependency>
@@ -37,14 +37,14 @@
         
         <dependency>
             <groupId>fr.soleil.lib</groupId>
-            <artifactId>NexusCPPV2-${aol}-static-${mode}</artifactId>
-            <version>2.3.3-vc9</version>
+            <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
+            <version>3.1.5-vc9</version>
         </dependency>
 				
         <dependency>
             <groupId>fr.soleil.lib</groupId>
             <artifactId>YAT-${aol}-static-${mode}</artifactId>
-            <version>1.10.3-vc9</version>
+            <version>1.13.4-vc9</version>
         </dependency>
             
         <dependency>
