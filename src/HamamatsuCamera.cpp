@@ -94,7 +94,7 @@ Camera::Camera(const std::string& config_path, int camera_number)
         // Will be also used to know if W-View mode is possible
         m_MaxViews = getMaxNumberofViews();
         
-        if(m_MaxViews > 0)
+        if(m_MaxViews > 1)
         {
             m_ViewExpTime = new double[m_MaxViews];
 
@@ -2022,8 +2022,7 @@ int Camera::getNumberofViews(void)
 	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_NUMBEROF_VIEW, &v );
     if( failed(err) )
     {
-        manage_error( deb, "Unable to retrieve the number of possible W-VIEW", err, "dcamprop_getvalue - DCAM_IDPROP_NUMBEROF_VIEW");
-        THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
+        manage_trace( deb, "Unable to retrieve the number of possible W-VIEW", err, "dcamprop_getvalue - DCAM_IDPROP_NUMBEROF_VIEW");
     }
     else    
     {
@@ -2048,14 +2047,15 @@ int Camera::getMaxNumberofViews(void)
 
     if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_NUMBEROF_VIEW", DCAM_IDPROP_NUMBEROF_VIEW, FeatureObj ) )
     {
-        manage_error( deb, "Failed to get number of view");
-        THROW_HW_ERROR(Error) << "Failed to get number of view";
+        manage_trace( deb, "Failed to get number of view");
     }
+    else
+    {
+	    DEB_TRACE() << g_TraceLineSeparator.c_str();
+        FeatureObj.traceGeneralInformations();
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
-    FeatureObj.traceGeneralInformations();
-
-    nView = static_cast<int32>(FeatureObj.m_max);
+        nView = static_cast<int32>(FeatureObj.m_max);
+    }
 
     DEB_TRACE() << DEB_VAR1(nView);
 
@@ -2073,29 +2073,38 @@ void Camera::setViewMode(bool in_ViewModeActivated, ///< [in] view mode activati
 
     DCAMERR  err;
 
-    if((in_ViewModeActivated) && (m_MaxViews > 1))
+    if(in_ViewModeActivated)
     {
-        // checking if the W-View mode is possible for this camera
-	    if( m_MaxViews < in_ViewsNumber )
+        if(m_MaxViews > 1)
         {
-            manage_error( deb, "Unable to activate W-VIEW mode", DCAMERR_NONE, NULL, "max views number %d, needed %d", m_MaxViews, in_ViewsNumber);
-            THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
+            // checking if the W-View mode is possible for this camera
+	        if( m_MaxViews < in_ViewsNumber )
+            {
+                manage_error( deb, "Unable to activate W-VIEW mode", DCAMERR_NONE, NULL, "max views number %d, needed %d", m_MaxViews, in_ViewsNumber);
+                THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
+            }
+
+		    // set split view mode
+		    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, static_cast<double>(DCAMPROP_SENSORMODE__SPLITVIEW) );
+
+            if( failed(err) )
+		    {
+                manage_error( deb, "Unable to activate W-VIEW mode", err, 
+                                   "dcamprop_setvalue", "DCAM_IDPROP_SENSORMODE - DCAMPROP_SENSORMODE__SPLITVIEW");
+                THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
+		    }
+
+            m_ViewModeEnabled = true          ; // W-View mode with splitting image
+            m_ViewNumber      = in_ViewsNumber; // number of W-Views
+
+            manage_trace( deb, "W-VIEW mode activated", DCAMERR_NONE, NULL, "views number %d", in_ViewsNumber);
         }
-
-		// set split view mode
-		err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, static_cast<double>(DCAMPROP_SENSORMODE__SPLITVIEW) );
-
-        if( failed(err) )
-		{
-            manage_error( deb, "Unable to activate W-VIEW mode", err, 
-                               "dcamprop_setvalue", "DCAM_IDPROP_SENSORMODE - DCAMPROP_SENSORMODE__SPLITVIEW");
-            THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
-		}
-
-        m_ViewModeEnabled = true          ; // W-View mode with splitting image
-        m_ViewNumber      = in_ViewsNumber; // number of W-Views
-
-        manage_trace( deb, "W-VIEW mode activated", DCAMERR_NONE, NULL, "views number %d", in_ViewsNumber);
+        else
+        // W-View is not supported for this camera
+        {
+            manage_error( deb, "Cannot set the W-View mode - This camera does not support the W-View mode.", DCAMERR_NONE);
+            THROW_HW_ERROR(Error) << "Cannot set the W-View mode - This camera does not support the W-View mode.";
+        }
     }
     else
     // unactivated
@@ -2166,6 +2175,13 @@ void Camera::setViewExpTime(int    ViewIndex, ///< [in] view index [0...m_MaxVie
 
     DCAMERR err;
 
+    // W-View is not supported for this camera
+    if(m_MaxViews < 2)
+    {
+        manage_error( deb, "Cannot set view exposure time - This camera does not support the W-View mode.", DCAMERR_NONE);
+        THROW_HW_ERROR(Error) << "Cannot set view exposure time - This camera does not support the W-View mode.";
+    }
+    else
     if(ViewIndex < m_MaxViews)
     {
         // Changing a View exposure time is not allowed if W-VIEW mode is not activated but we keep the value
@@ -2211,6 +2227,12 @@ void Camera::getViewExpTime(int      ViewIndex, ///< [in] view index [0...m_MaxV
 
     DCAMERR err;
 
+    // W-View is not supported for this camera
+    if(m_MaxViews < 2)
+    {
+        exp_time = m_exp_time;
+    }
+    else
     if(ViewIndex < m_MaxViews)
     {
         double exposure;
@@ -2254,14 +2276,17 @@ void Camera::getMinViewExpTime(double& exp_time) ///< [out] current exposure tim
 	double exposure    = -1.0; // we search the minimum value - this is the not set value
     double Viewexposure; 
 
-    while(ViewIndex < m_MaxViews)
+    if(m_MaxViews > 1)
     {
-        getViewExpTime(ViewIndex, Viewexposure);
-        
-        if((exposure == -1.0) || (Viewexposure < exposure))
-            exposure = Viewexposure; // sets the new minimum
+        while(ViewIndex < m_MaxViews)
+        {
+            getViewExpTime(ViewIndex, Viewexposure);
+            
+            if((exposure == -1.0) || (Viewexposure < exposure))
+                exposure = Viewexposure; // sets the new minimum
 
-        ViewIndex++;
+            ViewIndex++;
+        }
     }
 
     exp_time = exposure;
