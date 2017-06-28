@@ -1,75 +1,68 @@
-############################################################################
+###########################################################################
 # This file is part of LImA, a Library for Image Acquisition
 #
-# Copyright (C) : 2009-2017
-# European Synchrotron Radiation Facility
-# BP 220, Grenoble 38043
-# FRANCE
-#
-# This is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3 of the License, or
-# (at your option) any later version.
-#
-# This software is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, see <http://www.gnu.org/licenses/>.
+#  Copyright (C) : 2009-2017
+#  European Synchrotron Radiation Facility
+#  CS40220 38043 Grenoble Cedex 9 
+#  FRANCE
+# 
+#  Contact: lima@esrf.fr
+# 
+#  This is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+# 
+#  This software is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+# 
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, see <http://www.gnu.org/licenses/>.
 ############################################################################
-#CMakeLists.txt for Hamamatsu camera
 
 #HAVE TO BE UNDER WINDOWS
-IF(WIN32)
+if(WIN32)
+	set(NAME "hamamatsu")
+
 	#SOURCEs
-	SET(hamamatsu_srcs src/HamamatsuInterface.cpp src/HamamatsuCamera.cpp
+	set(${NAME}_srcs src/HamamatsuInterface.cpp src/HamamatsuCamera.cpp
 		src/HamamatsuBinCtrlObj.cpp src/HamamatsuDCAMSDKHelper.cpp
 		src/HamamatsuDetInfoCtrlObj.cpp src/HamamatsuRoiCtrlObj.cpp
 		src/HamamatsuSyncCtrlObj.cpp)
 	
-	#no VERSION FILE
-	#FILE(STRINGS "VERSION" photonic_ver)
-	ADD_LIBRARY(limahamamatsu SHARED ${hamamatsu_srcs})
+	add_library(lima${NAME} SHARED ${${NAME}_srcs})
 	
 	#INCLUDES
-	TARGET_INCLUDE_DIRECTORIES(limahamamatsu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-	TARGET_INCLUDE_DIRECTORIES(limahamamatsu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/include")
-	TARGET_INCLUDE_DIRECTORIES(limahamamatsu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/include/legacy")
+	target_include_directories(lima${NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+	target_include_directories(lima${NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/include")
+	target_include_directories(lima${NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/include/legacy")
 
-	TARGET_COMPILE_DEFINITIONS(limahamamatsu PRIVATE LIBHAMAMATSU_API)
-	TARGET_COMPILE_DEFINITIONS(limahamamatsu PRIVATE LIBHAMAMATSU_EXPORTS)
+	target_compile_definitions(lima${NAME} PRIVATE LIBPHAMAMATSU_EXPORTS)
 	
 	#LIBRARIES
-	FIND_LIBRARY(HAMAMATSU_LIB_DCAMAPI dcamapi "{CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/bin")
-	IF("${HAMAMATSU_LIB_DCAMAPI}" STREQUAL "HAMAMATSU_LIB_DCAMAPI-NOTFOUND")
-	  MESSAGE(FATAL_ERROR "hamamatsu : dcamapi.lib not found, you can search it in cmake-gui or try to install it if it isn't here.")
-	ENDIF()
-	FIND_LIBRARY(HAMAMATSU_LIB_DCIMGAPI dcimgapi "{CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/bin")
-	IF("${HAMAMATSU_LIB_DCIMGAPI}" STREQUAL "HAMAMATSU_LIB_DCIMGAPI-NOTFOUND")
-	  MESSAGE(FATAL_ERROR "hamamatsu : dcimgapi.lib not found, you can search it in cmake-gui or try to install it if it isn't here.")
-	ENDIF()
+	find_library(HAMAMATSU_DCAMAPI_LIB dcamapi "{CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/bin")
+	if("${HAMAMATSU_DCAMAPI_LIB}" STREQUAL "HAMAMATSU_DCAMAPI_LIB-NOTFOUND")
+	  message(FATAL_ERROR "${NAME} : dcamapi.lib not found, you can search it in cmake-gui or try to install it if it isn't here.")
+	endif()
+	find_library(HAMAMATSU_DCIMGAPI_LIB dcimgapi "{CMAKE_CURRENT_SOURCE_DIR}/sdk/msvc/bin")
+	if("${HAMAMATSU_DCIMGAPI_LIB}" STREQUAL "HAMAMATSU_DCIMGAPI_LIB-NOTFOUND")
+	  message(FATAL_ERROR "${NAME} : dcimgapi.lib not found, you can search it in cmake-gui or try to install it if it isn't here.")
+	endif()
 	
-	TARGET_LINK_LIBRARIES(limahamamatsu limacore)
-	TARGET_LINK_LIBRARIES(limahamamatsu ${HAMAMATSU_LIB_DCAMAPI})
-	TARGET_LINK_LIBRARIES(limahamamatsu ${HAMAMATSU_LIB_DCIMGAPI})
+	target_link_libraries(lima${NAME} limacore)
+	target_link_libraries(lima${NAME} ${HAMAMATSU_DCAMAPI_LIB})
+	target_link_libraries(lima${NAME} ${HAMAMATSU_DCIMGAPI_LIB})
 
-	#define version here.
-	set(MYLIB_VERSION_MAJOR 1)
-	set(MYLIB_VERSION_MINOR 0)
-	set(MYLIB_VERSION_PATCH 4)
-	set(MYLIB_VERSION_STRING ${MYLIB_VERSION_MAJOR}.${MYLIB_VERSION_MINOR}.${MYLIB_VERSION_PATCH})
-	SET_TARGET_PROPERTIES(limahamamatsu PROPERTIES VERSION ${MYLIB_VERSION_STRING} SOVERSION ${MYLIB_VERSION_MAJOR})
-	MESSAGE("limahamamatsu version defined in CMakeLists.txt. Create a VERSION file or modify lib version directly CMakeLists.txt.")
-    SET_TARGET_PROPERTIES(limahamamatsu PROPERTIES PREFIX "lib")
-    INSTALL(TARGETS limahamamatsu DESTINATION lib)
+	include(CameraVERSION)
+    set_target_properties(lima${NAME} PROPERTIES PREFIX "lib")
+    install(TARGETS lima${NAME} DESTINATION lib)
 
-	IF(COMPILE_SIP)
-		SET(NAME "hamamatsu")
+	if(LIMA_ENABLE_PYTHON)
 		include(CameraRunSIP)
-		INSTALL(FILES python/__init__.py DESTINATION "${PYTHON_SITE_PACKAGES_DIR}/Lima/Hamamatsu")
-	ENDIF()
-ELSE()
-	MESSAGE(FATAL_ERROR "This camera has to be compiled on Windows")
-ENDIF()
+		install(FILES python/__init__.py DESTINATION "${PYTHON_SITE_PACKAGES_DIR}/Lima/Hamamatsu")
+	endif()
+else()
+	message(FATAL_ERROR "This camera has to be compiled on Windows")
+endif()
