@@ -55,7 +55,7 @@ if(WIN32)
 	target_link_libraries(lima${NAME} ${HAMAMATSU_DCAMAPI_LIB})
 	target_link_libraries(lima${NAME} ${HAMAMATSU_DCIMGAPI_LIB})
 
-	include(CameraVERSION)
+	limatools_set_library_soversion(lima${NAME} "VERSION")
     set_target_properties(lima${NAME} PROPERTIES PREFIX "lib")
     install(TARGETS lima${NAME} DESTINATION lib)
 
