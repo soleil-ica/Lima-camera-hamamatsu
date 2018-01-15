@@ -23,6 +23,7 @@
 #define HAMAMATSUINTERFACE_H
 #include "HamamatsuCompatibility.h"
 #include "lima/HwInterface.h"
+#include "lima/HwEventCtrlObj.h"
 #include "HamamatsuCamera.h"
 #include "HamamatsuDetInfoCtrlObj.h"
 #include "HamamatsuSyncCtrlObj.h"
@@ -62,13 +63,14 @@ namespace lima
 		Camera& getCamera() { return m_cam;}
 
 	private:
-	    Camera&         m_cam;
-	    CapList         m_cap_list;
-	    DetInfoCtrlObj  m_det_info;
-	    SyncCtrlObj     m_sync;
-	    BinCtrlObj      m_bin;
-	    RoiCtrlObj      m_roi;
-	    mutable Cond    m_cond;
+	    Camera&          m_cam     ;
+	    CapList          m_cap_list;
+	    DetInfoCtrlObj   m_det_info;
+	    SyncCtrlObj      m_sync    ;
+	    BinCtrlObj       m_bin     ;
+	    RoiCtrlObj       m_roi     ;
+        HwEventCtrlObj * m_event   ;
+	    mutable Cond     m_cond    ;
 	};
 
     } // namespace Hamamatsu

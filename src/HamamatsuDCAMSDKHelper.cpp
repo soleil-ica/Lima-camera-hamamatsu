@@ -181,21 +181,24 @@ void Camera::manage_error( DebObj     & deb       ,       ///< [in] trace object
 /// find the corresponding string error using DCAM-API and trace this
 //  information as an error or an info.
 /*!
-@return none
+@return the trace text
 */
 //-----------------------------------------------------------------------------
-void Camera::static_manage_error( const Camera     * const cam,      ///< [in] camera object
-                                  DebObj           & deb      ,      ///< [in] trace object
-                                  const char       * optDesc  ,      ///< [in] optional description (NULL if not used)
-                                  int32              idStr    ,      ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
-                                  const char       * fct      ,      ///< [in] function name which returned the error (NULL if not used)
-                                  const char       * opt      , ...) ///< [in] optional string to concat to the error string (NULL if not used)
+std::string Camera::static_manage_error( const Camera     * const cam,      ///< [in] camera object
+                                         DebObj           & deb      ,      ///< [in] trace object
+                                         const char       * optDesc  ,      ///< [in] optional description (NULL if not used)
+                                         int32              idStr    ,      ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                         const char       * fct      ,      ///< [in] function name which returned the error (NULL if not used)
+                                         const char       * opt      , ...) ///< [in] optional string to concat to the error string (NULL if not used)
 {
-    va_list args(NULL);
+    va_list     args(NULL);
+    std::string FinalText ;
 
     va_start(args, opt);
-    static_trace_string_va_list( cam, deb, optDesc, idStr, fct, opt, args, true);
+    FinalText = static_trace_string_va_list( cam, deb, optDesc, idStr, fct, opt, args, true);
     va_end(args);
+    
+    return FinalText;
 }
 
 //-----------------------------------------------------------------------------
@@ -203,10 +206,10 @@ void Camera::static_manage_error( const Camera     * const cam,      ///< [in] c
 /// find the corresponding string error using DCAM-API and trace this
 //  information as an error or an info.
 /*!
-@return none
+@return the trace text
 */
 //-----------------------------------------------------------------------------
-void Camera::static_trace_string_va_list( const Camera     * const cam, ///< [in] camera object
+std::string Camera::static_trace_string_va_list( const Camera     * const cam, ///< [in] camera object
                                           DebObj           & deb      , ///< [in] trace object
                                           const char       * optDesc  , ///< [in] optional description (NULL if not used)
                                           int32              idStr    , ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
@@ -275,6 +278,8 @@ void Camera::static_trace_string_va_list( const Camera     * const cam, ///< [in
     {
         DEB_TRACE() << FinalText;
     }
+    
+    return FinalText;
 }
 
 //-----------------------------------------------------------------------------
