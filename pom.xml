@@ -10,7 +10,7 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaHamamatsu-${aol}-shared-${mode}</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
 
     <packaging>nar</packaging>
     <name>LimaHamamatsu</name>
@@ -26,7 +26,7 @@
         <dependency>
             <groupId>fr.soleil.lib</groupId>
             <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
-            <version>1.7.6</version>
+            <version>1.7.7-SNAPSHOT</version>
         </dependency>
         
         <!-- <dependency>

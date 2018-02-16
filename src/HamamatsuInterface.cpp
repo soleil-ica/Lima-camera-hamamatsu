@@ -52,6 +52,10 @@ Interface::Interface(Camera& cam)
 	   HwBinCtrlObj *bin = &m_bin;
 	   m_cap_list.push_back(HwCap(bin));
     }
+
+    //event capability
+    m_event = m_cam.getEventCtrlObj();    
+    m_cap_list.push_back(HwCap(m_event));
 }
 
 //-----------------------------------------------------

@@ -1463,7 +1463,6 @@ void Camera::CameraThread::execCmd(int cmd)
 			    break;
 	    }
     }
-    // don't know how to manage these exceptions because we are running a special thread
     catch (...)
     {
     }
@@ -1686,7 +1685,8 @@ void Camera::CameraThread::execStartAcq()
     	dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
         setStatus        ( CameraThread::Fault    );
 
-        static_manage_error( m_cam, deb, "Cannot start the capture", err, "dcamcap_start");
+        std::string errorText = static_manage_error( m_cam, deb, "Cannot start the capture", err, "dcamcap_start");
+        REPORT_EVENT(errorText);
         THROW_HW_ERROR(Error) << "Frame capture failed";
 	}
 
@@ -1744,7 +1744,9 @@ void Camera::CameraThread::execStartAcq()
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
-                static_manage_error( m_cam, deb, "Error during the frame capture wait", err, "dcamwait_start");
+                std::string errorText = static_manage_error( m_cam, deb, "Error during the frame capture wait", err, "dcamwait_start");
+                REPORT_EVENT(errorText);
+
 				THROW_HW_ERROR(Error) << "DCAMERR_TIMEOUT";
 			}
             else
@@ -1761,7 +1763,8 @@ void Camera::CameraThread::execStartAcq()
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
-                static_manage_error( m_cam, deb, "Error during the frame capture wait", err, "dcamwait_start");
+                std::string errorText = static_manage_error( m_cam, deb, "Error during the frame capture wait", err, "dcamwait_start");
+                REPORT_EVENT(errorText);
                 THROW_HW_ERROR(Error) << "Error during the frame capture wait";
 			}
 		}
@@ -1808,7 +1811,9 @@ void Camera::CameraThread::execStartAcq()
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
-				DEB_ERROR() << "No image captured.";
+                std::string errorText = "No image captured.";
+				DEB_ERROR() << errorText;
+                REPORT_EVENT(errorText);
 				THROW_HW_ERROR(Error) << "No image captured.";
 			}
 			if (deltaFrames > Camera::g_DCAMFrameBufferSize)
@@ -1875,7 +1880,8 @@ void Camera::CameraThread::execStartAcq()
         dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
         setStatus        ( CameraThread::Fault    );
 
-        static_manage_error( m_cam, deb, "Cannot stop acquisition.", err, "dcamcap_stop");
+        std::string errorText = static_manage_error( m_cam, deb, "Cannot stop acquisition.", err, "dcamcap_stop");
+        REPORT_EVENT(errorText);
         THROW_HW_ERROR(Error) << "Cannot stop acquisition.";
 	}
 
@@ -1888,7 +1894,8 @@ void Camera::CameraThread::execStartAcq()
 	if( failed(err) )
 	{
         setStatus(CameraThread::Fault);
-        static_manage_error( m_cam, deb, "Unable to free capture frame", err, "dcambuf_release");
+        std::string errorText = static_manage_error( m_cam, deb, "Unable to free capture frame", err, "dcambuf_release");
+        REPORT_EVENT(errorText);
         THROW_HW_ERROR(Error) << "Unable to free capture frame";
 	}
     else
@@ -1946,7 +1953,8 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
 			bImageCopied = false;
             setStatus(CameraThread::Fault);
 
-            static_manage_error( m_cam, deb, "Unable to lock frame data", err, "dcambuf_lockframe");
+            std::string errorText = static_manage_error( m_cam, deb, "Unable to lock frame data", err, "dcambuf_lockframe");
+            REPORT_EVENT(errorText);
             THROW_HW_ERROR(Error) << "Unable to lock frame data";
 	    }
         else
@@ -1966,9 +1974,9 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
 			    bImageCopied = true;
 
                 DEB_TRACE() << "Aquired m_image_number > " << m_cam->m_image_number
-                            << " (frameIndex:"          << iFrameIndex           << ")" 
-                            << " (rowbytes:"            << sRowbytes             << ")"
-                            << " (height:"              << height                << ")";
+                            << " (frameIndex:"             << iFrameIndex           << ")" 
+                            << " (rowbytes:"               << sRowbytes             << ")"
+                            << " (height:"                 << height                << ")";
             }
         }
 
@@ -1977,7 +1985,8 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
             setStatus(CameraThread::Fault);
 			CopySuccess = false;
 
-            static_manage_error( m_cam, deb, "Cannot get image.", DCAMERR_NONE, "copyFrames");
+            std::string errorText = static_manage_error( m_cam, deb, "Cannot get image.", DCAMERR_NONE, "copyFrames");
+            REPORT_EVENT(errorText);
             THROW_HW_ERROR(Error) << "Cannot get image.";
 			break;
 		}
@@ -2404,4 +2413,46 @@ void Camera::checkingROIproperties(void)
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE VIEW2", DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYHSIZE), NULL );
 	DEB_TRACE() << g_TraceLineSeparator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE VIEW2", DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYVSIZE), NULL );
+}
+
+//-----------------------------------------------------------------------------
+/// Return the current sensor temperature
+//-----------------------------------------------------------------------------
+double Camera::getSensorTemperature(bool & out_NotSupported)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    double  temperature = 0.0;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORTEMPERATURE, &temperature );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
+            out_NotSupported = true;
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the sensor temperature";
+        }
+    }    
+    else
+    {
+        out_NotSupported = false;
+        DEB_TRACE() << DEB_VAR1(temperature);
+    }
+    
+    return temperature;
+}
+
+//-----------------------------------------------------
+// Return the event control object
+//-----------------------------------------------------
+HwEventCtrlObj* Camera::getEventCtrlObj()
+{
+	return &m_event_ctrl_obj;
 }

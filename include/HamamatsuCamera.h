@@ -43,10 +43,16 @@
 #include "lima/HwBufferMgr.h"
 #include "lima/ThreadUtils.h"
 #include "lima/Timestamp.h"
+#include "lima/HwEventCtrlObj.h"
 
 #include <ostream>
 
 using namespace std;
+
+#define REPORT_EVENT(desc)  {   \
+                                Event *my_event = new Event(Hardware,Event::Info, Event::Camera, Event::Default,desc); \
+                                m_cam->getEventCtrlObj()->reportEvent(my_event); \
+                            }
 
 namespace lima
 {
@@ -104,6 +110,7 @@ namespace lima
     
 	    // -- Buffer control object
 	    HwBufferCtrlObj* getBufferCtrlObj();
+        HwEventCtrlObj * getEventCtrlObj ();
     
 	    //-- Synch control object
 	    bool checkTrigMode(TrigMode trig_mode);
@@ -153,11 +160,11 @@ namespace lima
         int  getNumberofViews   (void);
         int  getMaxNumberofViews(void);
 
-        void setViewExpTime(int    ViewIndex,  ///< [in] view index [0...m_MaxViews[
-                            double exp_time ); ///< [in] exposure time to set
+        void setViewExpTime(int    ViewIndex,     ///< [in] view index [0...m_MaxViews[
+                            double exp_time );    ///< [in] exposure time to set
 
-        void getViewExpTime(int      ViewIndex,  ///< [in] view index [0...m_MaxViews[
-                            double & exp_time ); ///< [out] current exposure time
+        void getViewExpTime(int      ViewIndex,   ///< [in] view index [0...m_MaxViews[
+                            double & exp_time );  ///< [out] current exposure time
 
         void getMinViewExpTime(double& exp_time); ///< [out] current exposure time
 
@@ -173,6 +180,8 @@ namespace lima
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
+        
+        double getSensorTemperature(bool & out_NotSupported); //< [out] attribut not supported by the camera
 
 	//-----------------------------------------------------------------------------
 	private:
@@ -299,21 +308,21 @@ namespace lima
                            const char * fct       = NULL        ,             ///< [in] function name which returned the error (NULL if not used)
                            const char * opt       = NULL        , ...) const; ///< [in] optional string to concat to the error string (NULL if not used)
 
-        static void static_manage_error( const Camera     * const cam              ,       ///< [in] camera object
-                                         DebObj           & deb                    ,       ///< [in] trace object
-                                         const char       * optDesc  = NULL        ,       ///< [in] optional description (NULL if not used)
-                                         int32              idStr    = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
-                                         const char       * fct      = NULL        ,       ///< [in] function name which returned the error (NULL if not used)
-                                         const char       * opt      = NULL        , ...); ///< [in] optional string to concat to the error string (NULL if not used)
+        static std::string static_manage_error( const Camera     * const cam              ,       ///< [in] camera object
+                                                DebObj           & deb                    ,       ///< [in] trace object
+                                                const char       * optDesc  = NULL        ,       ///< [in] optional description (NULL if not used)
+                                                int32              idStr    = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                                const char       * fct      = NULL        ,       ///< [in] function name which returned the error (NULL if not used)
+                                                const char       * opt      = NULL        , ...); ///< [in] optional string to concat to the error string (NULL if not used)
 
-        static void static_trace_string_va_list( const Camera     * const cam,  ///< [in] camera object
-                                                 DebObj           & deb      ,  ///< [in] trace object
-                                                 const char       * optDesc  ,  ///< [in] optional description (NULL if not used)
-                                                 int32              idStr    ,  ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
-                                                 const char       * fct      ,  ///< [in] function name which returned the error (NULL if not used)
-                                                 const char       * opt      ,  ///< [in] optional string to concat to the error string (NULL if not used)
-                                                 va_list            args     ,  ///< [in] optional args (printf style) to merge with the opt string (NULL if not used)
-                                                 bool               isError  ); ///< [in] true if traced like an error, false for a classic info trace
+        static std::string static_trace_string_va_list( const Camera     * const cam,  ///< [in] camera object
+                                                        DebObj           & deb      ,  ///< [in] trace object
+                                                        const char       * optDesc  ,  ///< [in] optional description (NULL if not used)
+                                                        int32              idStr    ,  ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                                        const char       * fct      ,  ///< [in] function name which returned the error (NULL if not used)
+                                                        const char       * opt      ,  ///< [in] optional string to concat to the error string (NULL if not used)
+                                                        va_list            args     ,  ///< [in] optional args (printf style) to merge with the opt string (NULL if not used)
+                                                        bool               isError  ); ///< [in] true if traced like an error, false for a classic info trace
 
 		//-----------------------------------------------------------------------------
         void   execStopAcq();
@@ -379,6 +388,7 @@ namespace lima
 		//-----------------------------------------------------------------------------
 	    //- lima stuff
 	    SoftBufferCtrlObj	        m_buffer_ctrl_obj;
+        HwEventCtrlObj              m_event_ctrl_obj ;
 	    int                         m_nb_frames      ;    
 	    Camera::Status              m_status         ;
 	    int                         m_image_number   ;
