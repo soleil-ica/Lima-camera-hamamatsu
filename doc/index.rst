@@ -7,24 +7,35 @@ Hamamatsu
 
 Introduction
 ````````````
+
 The Hamamatsu Orca flash is digital CMOS camera.
 It supports USB3 or direct camera link connectivity.
 
  - USB 3.0    -> 30fps
  - Cameralink -> 100fps
 
-The Lima plugin controls an Orca camera (**ORCA-Flash4.0 V2, C11440-22CU V2**) under Windows.
-It is based on the Hamamatsu DCAM-API SDK.
+The Lima plugin controls an Orca camera (**ORCA-Flash4.0 V2, C11440-22CU V2**) under Windows. It is based on the Hamamatsu DCAM-API SDK.
 
 Prerequisite
 ````````````````````
-Host OS is Windows (32 or 64 bits).
-The driver must be installed on the host system.
 
+Host OS is Windows (32 or 64 bits). The driver must be installed on the host system.
+
+Installation & Module configuration
+```````````````````````````````````
+
+Follow the generic instructions in :ref:`build_installation`. If using CMake directly, add the following flag:
+
+.. code-block:: sh
+
+ -DLIMACAMERA_HAMAMATSU=true
+
+For the Tango server installation, refers to :ref:`tango_installation`.
 
 Initialization and Capabilities
-````````````````````````````````
-In order to help people understand how the camera plugin has been implemented in LImA, this section provides some important informations about the developer's choices.
+```````````````````````````````
+
+Implementing a new plugin for new detector is driven by the LIMA framework but the developer has some freedoms to choose which standard and specific features will be made available. This section is supposed to give you the correct information regarding how the camera is exported within the LIMA framework.
 
 Camera initialization
 ......................
@@ -32,7 +43,7 @@ There is nothing specific.
 The available cameras must first be enumerated. A selected camera can then be inited.
 (Note that at the moment only one camera will be handled by the pluggin.)
 
-Std capabilites
+Std capabilities
 ................
 
 This plugin has been implemented in respect of the mandatory capabilites but with some limitations according to some programmer's choices.
@@ -81,17 +92,19 @@ Optional capabilities
 
  - There is no cooler sensor access or control to the cooling system via the DCAM-API SDK.
  - Cooling management is autonomous and can only be chosen between air or water cooling outside the sdk.
- 
+
 * Readout mode
 
  - Two readout modes are available: SLOW (30fps at full frame) or NORMAL (100fps at full frame).
 
 Configuration
 `````````````
+
 .. image:: orca_setup.png
 
 How to use
-````````````
+``````````
+
 The following set of functions is used as a wrapper to the DCAM-API SDK.
 Code can be found in the HamamatsuDCAMSDKHelper.cpp file.
 
