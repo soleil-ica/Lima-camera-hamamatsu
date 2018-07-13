@@ -653,7 +653,7 @@ Camera::Status Camera::getStatus() ///< [out] current camera status
 			return Camera::Fault   ;
 
         case CameraThread::InInit   :
-        case CameraThread::Stopped  :
+        //case CameraThread::Stopped  :
         case CameraThread::Finished :
             manage_error( deb, "CameraThread is on an invalid state.");
 			return Camera::Fault   ;
