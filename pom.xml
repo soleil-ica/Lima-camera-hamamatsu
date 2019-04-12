@@ -22,40 +22,82 @@
         <url>https://github.com/soleil-ica/Lima-camera-hamamatsu</url>
     </scm>
 
-    <dependencies>
-        <dependency>
-            <groupId>fr.soleil.lib</groupId>
-            <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
-            <version>1.7.7</version>
-        </dependency>
-        
-        <!-- <dependency>
-            <groupId>com.hamamatsu</groupId>
-            <artifactId>dcamapi-${aol}-shared-${mode}</artifactId>
-            <version>13.10</version>
-        </dependency>       
-		-->  
-        
-        <dependency>
-            <groupId>fr.soleil.lib</groupId>
-            <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
-            <version>3.1.5-vc9</version>
-        </dependency>
-				
-        <dependency>
-            <groupId>fr.soleil.lib</groupId>
-            <artifactId>YAT-${aol}-static-${mode}</artifactId>
-            <version>1.13.4-vc9</version>
-        </dependency>
-            
-        <dependency>
-            <groupId>ncsa.uiuc.edu</groupId>
-            <artifactId>HDF5-${aol}-shared-release</artifactId>
-            <version>1.8.13-vc9</version>
-        </dependency>    
-  
-    </dependencies>
+    <profiles>
+        <profile>
+            <id>win_32</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>                
+                <property>
+                    <name>env</name>
+                    <value>win_32</value>
+                </property>
+            </activation>
+			
+            <dependencies>
+                <dependency>
+                    <groupId>fr.soleil.lib</groupId>
+                    <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
+                    <version>1.7.7</version>
+                </dependency>
 
+				<dependency>
+					<groupId>fr.soleil.lib</groupId>
+                    <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
+                    <version>3.1.5-vc9</version>
+				</dependency>
+                        
+                <dependency>
+                    <groupId>fr.soleil.lib</groupId>
+                    <artifactId>YAT-${aol}-static-${mode}</artifactId>
+                    <version>1.13.4-vc9</version>
+                </dependency>
+                    
+                <dependency>
+                    <groupId>ncsa.uiuc.edu</groupId>
+                    <artifactId>HDF5-${aol}-shared-release</artifactId>
+                    <version>1.8.13-vc9</version>
+                </dependency>    
+                            
+            </dependencies>
+        </profile>
+        
+        <profile>
+            <id>win_32_vc12</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>                
+                <property>
+                    <name>env</name>
+                    <value>win_32_vc12</value>
+                </property>
+            </activation>
+			
+            <dependencies>
+                <dependency>
+                    <groupId>fr.soleil.lib</groupId>
+                    <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
+                    <version>1.7.7</version>
+                </dependency>
+
+				<dependency>
+					<groupId>fr.soleil.lib</groupId>
+                    <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
+				</dependency>
+                        
+                <dependency>
+                    <groupId>fr.soleil.lib</groupId>
+                    <artifactId>YAT-${aol}-static-${mode}</artifactId>
+                </dependency>
+                    
+                <dependency>
+                    <groupId>ncsa.uiuc.edu</groupId>
+                    <artifactId>HDF5-${aol}-shared-release</artifactId>
+                </dependency>    
+                            
+            </dependencies>
+        </profile>
+        
+    </profiles>
+    
     <build>
         <plugins>
             <plugin>
