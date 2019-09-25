@@ -29,7 +29,7 @@
 
 using namespace lima;
 using namespace lima::Hamamatsu;
-using namespace std;
+//using namespace std;
 
 //-----------------------------------------------------------------------------
 const double Camera::g_OrcaPixelSize            = 6.5e-6;
