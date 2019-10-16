@@ -22,8 +22,8 @@
     </scm>
 
 	<properties>
-		<sdkhamamatsu-lib>${project.basedir}\temp-new-sdk\bin\</sdkhamamatsu-lib>
-		<sdkhamamatsu-include>${project.basedir}\temp-new-sdk\include\</sdkhamamatsu-include>
+		<sdkhamamatsu-lib>${project.basedir}\dcamsdk4\lib\win32\</sdkhamamatsu-lib>
+		<sdkhamamatsu-include>${project.basedir}\dcamsdk4\inc\</sdkhamamatsu-include>
 	</properties>
 	
     <dependencies>
@@ -56,14 +56,14 @@
                             <define>NDEBUG</define>
                             <define>_WINDOWS</define>
                             <define>_USRDLL</define>
-                            <define>_WIN32_WINNT=0x0502</define>  <!-- For Windows XP Support -->
+                            <define>_WIN32_WINNT=_WIN32_WINNT_WIN7</define>
                         </defines>
 					</cpp>
 					<linker>
 						<libs>
 							<lib>
 								<name>dcamapi</name>
-								<type>static</type>
+								<type>shared</type>
 								<directory>${sdkhamamatsu-lib}</directory>
 							</lib>
 						</libs>
