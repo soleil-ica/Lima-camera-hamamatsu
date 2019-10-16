@@ -919,12 +919,12 @@ bool Camera::FeatureInfos::checkifValueExists(const double ValueToCheck) const /
 {
 	DEB_MEMBER_FUNCT();
 
-    bool          bFound   = false                  ;
-    unsigned int  vectSize = m_vectModeValues.size();
+    bool   bFound   = false                  ;
+    size_t vectSize = m_vectModeValues.size();
 
     if(vectSize > 0)
     {
-        for (unsigned int i = 0 ; i < vectSize ; i++)
+        for (size_t i = 0 ; i < vectSize ; i++)
 	    {
 		    if (ValueToCheck == m_vectModeValues.at(i))
 		    {
@@ -946,8 +946,8 @@ void Camera::FeatureInfos::traceModePossibleValues(void) const
 {
 	DEB_MEMBER_FUNCT();
 
-    unsigned int  vectModeLabelsSize = m_vectModeLabels.size();
-    unsigned int  vectModeValuesSize = m_vectModeValues.size();
+    size_t vectModeLabelsSize = m_vectModeLabels.size();
+    size_t vectModeValuesSize = m_vectModeValues.size();
 
     DEB_TRACE() << "checking " << m_name << " property values:";
 
@@ -962,9 +962,9 @@ void Camera::FeatureInfos::traceModePossibleValues(void) const
     }
     else
     {
-        unsigned int ValueIndex;
+        size_t ValueIndex;
 
-        for(ValueIndex = 0 ; ValueIndex < m_vectModeLabels.size() ; ValueIndex++)
+        for(ValueIndex = 0 ; ValueIndex < vectModeLabelsSize ; ValueIndex++)
         {
             DEB_TRACE() << "value " << ValueIndex
                         << " (" << m_vectModeValues[ValueIndex] << ") " 

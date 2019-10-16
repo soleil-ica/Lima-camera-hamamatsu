@@ -70,7 +70,6 @@ namespace lima
 
     //-----------------------------------------------------------------------------
 	public:
-
 	    enum Status 
         {
 		    Ready, Exposure, Readout, Latency, Fault
@@ -88,6 +87,40 @@ namespace lima
         {
             Trigger_Polarity_Negative, // Falling edge or LOW level.
             Trigger_Polarity_Positive, // Rising edge or HIGH level.
+        };
+
+        // relative to DCAM_IDPROP_SENSORCOOLER
+        enum Cooler_Mode
+        {
+            Cooler_Mode_Not_Supported, 
+            Cooler_Mode_Off          , // DCAMPROP_SENSORCOOLER__OFF
+            Cooler_Mode_On           , // DCAMPROP_SENSORCOOLER__ON
+            Cooler_Mode_Max          , // DCAMPROP_SENSORCOOLER__MAX
+        };
+
+        // relative to DCAM_IDPROP_SENSORTEMPERATURE_STATUS
+        enum Temperature_Status
+        {
+            Temperature_Status_Not_Supported, 
+            Temperature_Status_Normal       , // DCAMPROP_SENSORTEMPERATURE_STATUS__NORMAL
+            Temperature_Status_Warning      , // DCAMPROP_SENSORTEMPERATURE_STATUS__WARNING
+            Temperature_Status_Protection   , // DCAMPROP_SENSORTEMPERATURE_STATUS__PROTECTION
+        };
+
+        // relative to DCAM_IDPROP_SENSORCOOLERSTATUS
+        enum Cooler_Status
+        {
+            Cooler_Status_Not_Supported, 
+            Cooler_Status_Error4       , // DCAMPROP_SENSORCOOLERSTATUS__ERROR4
+            Cooler_Status_Error3       , // DCAMPROP_SENSORCOOLERSTATUS__ERROR3
+            Cooler_Status_Error2       , // DCAMPROP_SENSORCOOLERSTATUS__ERROR2
+            Cooler_Status_Error1       , // DCAMPROP_SENSORCOOLERSTATUS__ERROR1
+            Cooler_Status_None         , // DCAMPROP_SENSORCOOLERSTATUS__NONE
+            Cooler_Status_Off          , // DCAMPROP_SENSORCOOLERSTATUS__OFF
+            Cooler_Status_Ready        , // DCAMPROP_SENSORCOOLERSTATUS__READY
+            Cooler_Status_Busy         , // DCAMPROP_SENSORCOOLERSTATUS__BUSY
+            Cooler_Status_Always       , // DCAMPROP_SENSORCOOLERSTATUS__ALWAYS
+            Cooler_Status_Warning      , // DCAMPROP_SENSORCOOLERSTATUS__WARNING
         };
 
 	//-----------------------------------------------------------------------------
@@ -182,6 +215,10 @@ namespace lima
         void checkingROIproperties(void);
         
         double getSensorTemperature(bool & out_NotSupported); //< [out] attribut not supported by the camera
+
+        enum Camera::Cooler_Mode        getCoolerMode       (void);
+        enum Camera::Temperature_Status getTemperatureStatus(void);
+        enum Camera::Cooler_Status      getCoolerStatus     (void);
 
 	//-----------------------------------------------------------------------------
 	private:
@@ -383,7 +420,7 @@ namespace lima
         int32 GetBinningMode    (const int   binValue); ///< [in] binning value to chck for
         int   GetBinningFromMode(const int32 binMode );	///< [in] binning mode to chck for
 
-		vector<int>					 m_vectBinnings   ; /// list of available binning modes
+		vector<int> m_vectBinnings; /// list of available binning modes
 		
 		//-----------------------------------------------------------------------------
 	    //- lima stuff
