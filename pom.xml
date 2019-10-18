@@ -32,6 +32,13 @@
             <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
             <version>1.7.9</version>
         </dependency>
+		
+		<!-- LimaProcesslib -->        
+		<dependency>
+			<groupId>fr.soleil.lib</groupId>
+			<artifactId>LimaProcesslib-${aol}-shared-${mode}</artifactId>
+			<version>1.3.9</version>
+		</dependency>
     </dependencies>
     
     <build>
