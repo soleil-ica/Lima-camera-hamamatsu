@@ -10,28 +10,11 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaHamamatsu-${aol}-shared-${mode}</artifactId>
-    <version>2.2.0</version>
+    <version>2.3.0</version>
 
     <packaging>nar</packaging>
     <name>LimaHamamatsu</name>
     <description>This module controls the Hamamatsu Detector</description>
-
-<!--    <profiles>    
-        <profile>
-            <id>Windows7_x64</id>
-            <activation>
-            <os>
-                <family>windows</family>
-                <name>windows 7</name>
-            </os>
-            </activation>
-            
-      <properties>
-		    <FSOpt.value></FSOpt.value>
-      </properties>
-            
-        </profile>
-    </profiles>   --> 
     
     <scm>
         <connection>scm:git:git://github.com/soleil-ica/Lima-camera-hamamatsu.git</connection>
@@ -51,8 +34,8 @@
 		<nexuscpp-lib>${libs-64bits}\nexuscpp\target\nar\lib\amd64-Windows-msvc\shared</nexuscpp-lib>
 		<nexuscpp-include>${libs-64bits}\nexuscpp\target\nar\include\</nexuscpp-include>
 		
-		<sdkhamamatsu-lib>${project.basedir}\new-sdk\lib\win64\</sdkhamamatsu-lib>
-		<sdkhamamatsu-include>${project.basedir}\new-sdk\inc\</sdkhamamatsu-include>
+		<sdkhamamatsu-lib>${project.basedir}\dcamsdk4\lib\win64\</sdkhamamatsu-lib>
+		<sdkhamamatsu-include>${project.basedir}\dcamsdk4\inc\</sdkhamamatsu-include>
 	</properties>
 	
     <dependencies>

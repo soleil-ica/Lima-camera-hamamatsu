@@ -1569,7 +1569,7 @@ void Camera::CameraThread::abortCapture(void)
 {
 	DEB_MEMBER_FUNCT();
 
-    DCAMERR err;
+    DCAMERR err = DCAMERR_NONE;
 
 	m_cam->m_mutexForceStop.lock();
 
@@ -2447,6 +2447,145 @@ double Camera::getSensorTemperature(bool & out_NotSupported)
     }
     
     return temperature;
+}
+
+//-----------------------------------------------------------------------------
+/// Return the current cooler mode
+//-----------------------------------------------------------------------------
+enum Camera::Cooler_Mode Camera::getCoolerMode(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    enum Cooler_Mode result = Cooler_Mode::Cooler_Mode_Not_Supported;
+
+    DCAMERR err ;
+    double  temp;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORCOOLER, &temp );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            manage_trace( deb, "Unable to retrieve the sensor cooler", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLER");
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the sensor cooler", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLER");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the sensor cooler";
+        }
+    }    
+    else
+    {
+    	int32 nMode = static_cast<int32>(temp);
+
+        DEB_TRACE() << DEB_VAR1(nMode);
+
+		switch (nMode)
+		{
+            case DCAMPROP_SENSORCOOLER__OFF: result = Cooler_Mode::Cooler_Mode_Off; break;
+            case DCAMPROP_SENSORCOOLER__ON : result = Cooler_Mode::Cooler_Mode_On ; break;
+            case DCAMPROP_SENSORCOOLER__MAX: result = Cooler_Mode::Cooler_Mode_Max; break;
+			default: break; // result will be Sensor_Cooler_Not_Supported
+		}
+    }
+    
+    return result;
+}
+
+//-----------------------------------------------------------------------------
+/// Return the current temperature status
+//-----------------------------------------------------------------------------
+enum Camera::Temperature_Status Camera::getTemperatureStatus(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    enum Temperature_Status result = Temperature_Status::Temperature_Status_Not_Supported;
+
+    DCAMERR err ;
+    double  temp;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORTEMPERATURE_STATUS, &temp );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            manage_trace( deb, "Unable to retrieve the temperature status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE_STATUS");
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the temperature status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE_STATUS");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the temperature status";
+        }
+    }    
+    else
+    {
+    	int32 nMode = static_cast<int32>(temp);
+
+        DEB_TRACE() << DEB_VAR1(nMode);
+
+		switch (nMode)
+		{
+            case DCAMPROP_SENSORTEMPERATURE_STATUS__NORMAL    : result = Temperature_Status::Temperature_Status_Normal    ; break;
+            case DCAMPROP_SENSORTEMPERATURE_STATUS__WARNING   : result = Temperature_Status::Temperature_Status_Warning   ; break;
+            case DCAMPROP_SENSORTEMPERATURE_STATUS__PROTECTION: result = Temperature_Status::Temperature_Status_Protection; break;
+			default: break; // result will be Temperature_Status_Not_Supported
+		}
+    }
+    
+    return result;
+}
+
+//-----------------------------------------------------------------------------
+/// Return the current cooler status
+//-----------------------------------------------------------------------------
+enum Camera::Cooler_Status Camera::getCoolerStatus(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    enum Cooler_Status result = Cooler_Status::Cooler_Status_Not_Supported;
+
+    DCAMERR err ;
+    double  temp;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORCOOLERSTATUS, &temp );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            manage_trace( deb, "Unable to retrieve the cooler status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLERSTATUS");
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the cooler status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLERSTATUS");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the cooler status";
+        }
+    }    
+    else
+    {
+    	int32 nMode = static_cast<int32>(temp);
+
+        DEB_TRACE() << DEB_VAR1(nMode);
+
+		switch (nMode)
+		{
+            case DCAMPROP_SENSORCOOLERSTATUS__ERROR4 : result = Cooler_Status::Cooler_Status_Error4 ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__ERROR3 : result = Cooler_Status::Cooler_Status_Error3 ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__ERROR2 : result = Cooler_Status::Cooler_Status_Error2 ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__ERROR1 : result = Cooler_Status::Cooler_Status_Error1 ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__NONE   : result = Cooler_Status::Cooler_Status_None   ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__OFF    : result = Cooler_Status::Cooler_Status_Off    ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__READY  : result = Cooler_Status::Cooler_Status_Ready  ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__BUSY   : result = Cooler_Status::Cooler_Status_Busy   ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__ALWAYS : result = Cooler_Status::Cooler_Status_Always ; break;
+            case DCAMPROP_SENSORCOOLERSTATUS__WARNING: result = Cooler_Status::Cooler_Status_Warning; break;
+            default: break; // result will be Cooler_Status_Not_Supported
+		}
+    }
+    
+    return result;
 }
 
 //-----------------------------------------------------
