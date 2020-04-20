@@ -45,6 +45,29 @@ const string Camera::g_TraceLittleLineSeparator = "-----------------------------
 #define GET_SUBARRAY_RECT_DO_NOT_USE_VIEW (-1)
 
 //-----------------------------------------------------------------------------
+#define SENSOR_COOLER_NOT_SUPPORTED "NOT_SUPPORTED"
+#define SENSOR_COOLER_OFF           "OFF"
+#define SENSOR_COOLER_ON            "ON"
+#define SENSOR_COOLER_MAX           "MAX"
+
+#define TEMPERATURE_STATUS_NOT_SUPPORTED "NOT_SUPPORTED"
+#define TEMPERATURE_STATUS_NORMAL        "NORMAL"
+#define TEMPERATURE_STATUS_WARNING       "WARNING"
+#define TEMPERATURE_STATUS_PROTECTION    "PROTECTION"
+
+#define COOLER_STATUS_NOT_SUPPORTED "NOT_SUPPORTED"
+#define COOLER_STATUS_ERROR4        "ERROR4"
+#define COOLER_STATUS_ERROR3        "ERROR3"
+#define COOLER_STATUS_ERROR2        "ERROR2"
+#define COOLER_STATUS_ERROR1        "ERROR1"
+#define COOLER_STATUS_NONE          "NONE"
+#define COOLER_STATUS_OFF           "OFF"
+#define COOLER_STATUS_READY         "READY"
+#define COOLER_STATUS_BUSY          "BUSY"
+#define COOLER_STATUS_ALWAYS        "ALWAYS"
+#define COOLER_STATUS_WARNING       "WARNING"
+
+//-----------------------------------------------------------------------------
 ///  Ctor
 //-----------------------------------------------------------------------------
 #pragma warning( push )
@@ -150,7 +173,6 @@ Camera::Camera(const std::string& config_path, int camera_number)
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 ///  Dtor
 //-----------------------------------------------------------------------------
@@ -198,7 +220,6 @@ void Camera::getDetectorMaxImageSize(Size& size) ///< [out] image dimensions
 	size = Size(m_maxImageWidth, m_maxImageHeight);
 }
 
-
 //-----------------------------------------------------------------------------
 /// return the detector image size 
 //-----------------------------------------------------------------------------
@@ -226,7 +247,6 @@ void Camera::getDetectorImageSize(Size& size) ///< [out] image dimensions
 
     DEB_TRACE() << "Size (" << DEB_VAR2(size.getWidth(), size.getHeight()) << ")";
 }
-
 
 //-----------------------------------------------------------------------------
 /// return the image type  TODO: this is permanently called by the device -> find a way to avoid DCAM access
@@ -260,7 +280,6 @@ void Camera::getImageType(ImageType& type)
 	}
 }
 
-
 //-----------------------------------------------------
 //! Camera::setImageType()
 //-----------------------------------------------------
@@ -285,7 +304,6 @@ void Camera::setImageType(ImageType type)
 	m_bytesPerPixel = m_depth / 8;
 }
 
-
 //-----------------------------------------------------------------------------
 /// return the detector type
 //-----------------------------------------------------------------------------
@@ -296,7 +314,6 @@ void Camera::getDetectorType(string& type) ///< [out] detector type
     type = m_detector_type;
 }
 
-
 //-----------------------------------------------------------------------------
 /// return the detector model
 //-----------------------------------------------------------------------------
@@ -305,7 +322,6 @@ void Camera::getDetectorModel(string& type) ///< [out] detector model
     DEB_MEMBER_FUNCT();
     type = m_detector_model;
 }
-
 
 //-----------------------------------------------------------------------------
 /// return the internal buffer manager
@@ -318,7 +334,6 @@ HwBufferCtrlObj* Camera::getBufferCtrlObj()
     DEB_MEMBER_FUNCT();
     return &m_buffer_ctrl_obj;
 }
-
 
 //-----------------------------------------------------------------------------
 /// Checks trigger mode
@@ -333,7 +348,6 @@ bool Camera::checkTrigMode(TrigMode trig_mode) ///< [in] trigger mode to check
 
     return Camera::getTriggerMode(trig_mode);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Set the new trigger mode
@@ -440,7 +454,6 @@ void Camera::setTrigMode(TrigMode mode) ///< [in] trigger mode to set
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the current trigger mode
 //-----------------------------------------------------------------------------
@@ -451,7 +464,6 @@ void Camera::getTrigMode(TrigMode& mode) ///< [out] current trigger mode
     
     DEB_RETURN() << DEB_VAR1(mode);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Set the new exposure time
@@ -482,7 +494,6 @@ void Camera::setExpTime(double exp_time) ///< [in] exposure time to set
         manage_trace( deb, "Changed Exposure time", DCAMERR_NONE, NULL, "exp:%lf >> real:%lf", m_exp_time, tempexp_time);
     }
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the current exposure time
@@ -518,7 +529,6 @@ void Camera::getExpTime(double& exp_time) ///< [out] current exposure time
     DEB_RETURN() << DEB_VAR1(exp_time);
 }
 
-
 //-----------------------------------------------------------------------------
 /// Set the new latency time between images
 //-----------------------------------------------------------------------------
@@ -534,7 +544,6 @@ void Camera::setLatTime(double lat_time) ///< [in] latency time
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the current latency time
 //-----------------------------------------------------------------------------
@@ -546,7 +555,6 @@ void Camera::getLatTime(double& lat_time) ///< [out] current latency time
     
     DEB_RETURN() << DEB_VAR1(lat_time);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the exposure time range
@@ -571,7 +579,6 @@ void Camera::getExposureTimeRange(double& min_expo,	///< [out] minimum exposure 
     DEB_RETURN() << DEB_VAR2(min_expo, max_expo);
 }
 
-
 //-----------------------------------------------------------------------------
 ///  Get the latency time range
 //-----------------------------------------------------------------------------
@@ -590,7 +597,6 @@ void Camera::getLatTimeRange(double& min_lat, ///< [out] minimum latency
     DEB_RETURN() << DEB_VAR2(min_lat, max_lat);
 }
 
-
 //-----------------------------------------------------------------------------
 /// Set the number of frames to be taken
 //-----------------------------------------------------------------------------
@@ -602,7 +608,6 @@ void Camera::setNbFrames(int nb_frames) ///< [in] number of frames to take
     m_nb_frames = nb_frames;
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the number of frames to be taken
 //-----------------------------------------------------------------------------
@@ -613,7 +618,6 @@ void Camera::getNbFrames(int& nb_frames) ///< [out] current number of frames to 
     DEB_RETURN() << DEB_VAR1(nb_frames);
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the current acquired frames
 //-----------------------------------------------------------------------------
@@ -622,7 +626,6 @@ void Camera::getNbHwAcquiredFrames(int &nb_acq_frames)
     DEB_MEMBER_FUNCT();    
     nb_acq_frames = m_image_number;
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the camera status
@@ -662,7 +665,6 @@ Camera::Status Camera::getStatus() ///< [out] current camera status
 			throw LIMA_HW_EXC(Error, "Invalid thread status");
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 /// checkRoi
@@ -714,7 +716,6 @@ void Camera::checkRoi(const Roi & set_roi, ///< [in]  Roi values to set
 
     DEB_RETURN() << DEB_VAR1(hw_roi);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Set the new roi
@@ -795,7 +796,6 @@ void Camera::setRoi(const Roi & set_roi) ///< [in] New Roi values
 
     m_roi = new_roi;
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the current roi values
@@ -882,7 +882,6 @@ void Camera::checkBin(Bin & hw_bin) ///< [out] binning values to update
     DEB_RETURN() << DEB_VAR1(hw_bin);
 }
 
-
 //-----------------------------------------------------------------------------
 /// set the new binning mode
 //-----------------------------------------------------------------------------
@@ -911,7 +910,6 @@ void Camera::setBin(const Bin & set_bin) ///< [in] binning values objects
     
     DEB_RETURN() << DEB_VAR1(set_bin);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the current binning mode
@@ -943,7 +941,6 @@ void Camera::getBin(Bin & hw_bin) ///< [out] binning values object
 
     DEB_RETURN() << DEB_VAR1(hw_bin);
 }
-
 
 //-----------------------------------------------------------------------------
 /// Check if a binning value is supported
@@ -1020,7 +1017,6 @@ bool Camera::isBinningAvailable()
     return true;
 }
 
-
 //-----------------------------------------------------------------------------
 /// return the detector pixel size in meter
 //-----------------------------------------------------------------------------
@@ -1034,7 +1030,6 @@ void Camera::getPixelSize(double& sizex,	///< [out] horizontal pixel size
     DEB_RETURN() << DEB_VAR2(sizex, sizey); 
 }
 
-
 //-----------------------------------------------------------------------------
 /// reset the camera, no hw reset available on Hamamatsu camera
 //-----------------------------------------------------------------------------
@@ -1043,7 +1038,6 @@ void Camera::reset()
     DEB_MEMBER_FUNCT();
     return;
 }
-
 
 //-----------------------------------------------------------------------------
 ///    initialise controller with speeds and preamp gain
@@ -1250,7 +1244,6 @@ bool Camera::getTriggerMode(const TrigMode trig_mode) const ///< [in]  lima trig
     return result;
 }
 
-
 //-----------------------------------------------------------------------------
 /// Set the readout speed value
 /*!
@@ -1276,7 +1269,6 @@ void Camera::setReadoutSpeed(const short int readoutSpeed) ///< [in] new readout
 	m_read_mode = readoutSpeed;
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the readout speed value
 //-----------------------------------------------------------------------------
@@ -1287,7 +1279,6 @@ void Camera::getReadoutSpeed(short int& readoutSpeed)		///< [out] current readou
 	readoutSpeed = m_read_mode;
 }
 
-
 //-----------------------------------------------------------------------------
 /// Get the lost frames value
 //-----------------------------------------------------------------------------
@@ -1297,7 +1288,6 @@ void Camera::getLostFrames(unsigned long int& lostFrames)	///< [out] current los
 
 	lostFrames = m_lostFramesCount;
 }
-
 
 //-----------------------------------------------------------------------------
 /// Get the lost frames value
@@ -1319,7 +1309,6 @@ void Camera::prepareAcq()
 {
 	DEB_MEMBER_FUNCT();
 }
-
 
 //-----------------------------------------------------------------------------
 ///  start the acquistion
@@ -1372,7 +1361,6 @@ void Camera::startAcq()
 	m_thread.sendCmd      (CameraThread::StartAcq);
 	m_thread.waitNotStatus(CameraThread::Ready   );
 }
-
 
 //-----------------------------------------------------------------------------
 /// stop the acquisition
@@ -1912,7 +1900,6 @@ void Camera::CameraThread::execStartAcq()
 	DEB_TRACE() << "CameraThread::execStartAcq - END";
 }
 
-
 //-----------------------------------------------------------------------------
 // Copy the given frames to the buffer manager
 //-----------------------------------------------------------------------------
@@ -2042,7 +2029,6 @@ int Camera::getNumberofViews(void)
 
     return  nView;
 }
-
 
 //-----------------------------------------------------------------------------
 /// Return the maximum number of views for this camera
@@ -2416,9 +2402,42 @@ void Camera::checkingROIproperties(void)
 }
 
 //-----------------------------------------------------------------------------
+/// Return the sensor temperature support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isSensorTemperatureSupported(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    bool    Supported;
+    double  temperature = 0.0;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORTEMPERATURE, &temperature );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            Supported = false;
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the sensor temperature";
+        }
+    }    
+    else
+    {
+        Supported = true;
+    }
+
+    return Supported;
+}
+
+//-----------------------------------------------------------------------------
 /// Return the current sensor temperature
 //-----------------------------------------------------------------------------
-double Camera::getSensorTemperature(bool & out_NotSupported)
+double Camera::getSensorTemperature(void)
 {
     DEB_MEMBER_FUNCT();
 
@@ -2429,24 +2448,30 @@ double Camera::getSensorTemperature(bool & out_NotSupported)
     
     if( failed(err) )
 	{
-        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
+
+        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
         {
-            manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
-            out_NotSupported = true;
-        }
-        else
-        {
-            manage_trace( deb, "Unable to retrieve the sensor temperature", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE");
             THROW_HW_ERROR(Error) << "Unable to retrieve the sensor temperature";
         }
     }    
     else
     {
-        out_NotSupported = false;
         DEB_TRACE() << DEB_VAR1(temperature);
     }
     
     return temperature;
+}
+
+//=============================================================================
+// COOLER MODE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the cooler mode support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isCoolerModeSupported(void)
+{
+    return !(getCoolerMode() == Cooler_Mode::Cooler_Mode_Not_Supported);
 }
 
 //-----------------------------------------------------------------------------
@@ -2465,13 +2490,10 @@ enum Camera::Cooler_Mode Camera::getCoolerMode(void)
     
     if( failed(err) )
 	{
-        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        manage_trace( deb, "Unable to retrieve the sensor cooler", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLER");
+
+        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
         {
-            manage_trace( deb, "Unable to retrieve the sensor cooler", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLER");
-        }
-        else
-        {
-            manage_trace( deb, "Unable to retrieve the sensor cooler", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLER");
             THROW_HW_ERROR(Error) << "Unable to retrieve the sensor cooler";
         }
     }    
@@ -2494,6 +2516,44 @@ enum Camera::Cooler_Mode Camera::getCoolerMode(void)
 }
 
 //-----------------------------------------------------------------------------
+// Get the cooler mode label.
+//-----------------------------------------------------------------------------
+std::string Camera::getCoolerModeLabel(void)
+{
+    return getCoolerModeLabelFromMode(getCoolerMode());
+}
+
+//-----------------------------------------------------------------------------
+// Get a cooler mode label from a mode.
+//-----------------------------------------------------------------------------
+std::string Camera::getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode)
+{
+    std::string label = "";
+
+    switch (in_cooler_mode)
+    {
+        case Camera::Cooler_Mode_Off          : label = SENSOR_COOLER_OFF          ; break;
+        case Camera::Cooler_Mode_On           : label = SENSOR_COOLER_ON           ; break;
+        case Camera::Cooler_Mode_Max          : label = SENSOR_COOLER_MAX          ; break;
+        case Camera::Cooler_Mode_Not_Supported: label = SENSOR_COOLER_NOT_SUPPORTED; break;
+	    default: break;
+    }
+
+    return label;
+}
+
+//=============================================================================
+// TEMPERATURE STATUS
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the temperature status support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isTemperatureStatusSupported(void)
+{
+    return !(getTemperatureStatus() == Temperature_Status::Temperature_Status_Not_Supported);
+}
+
+//-----------------------------------------------------------------------------
 /// Return the current temperature status
 //-----------------------------------------------------------------------------
 enum Camera::Temperature_Status Camera::getTemperatureStatus(void)
@@ -2509,13 +2569,10 @@ enum Camera::Temperature_Status Camera::getTemperatureStatus(void)
     
     if( failed(err) )
 	{
-        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        manage_trace( deb, "Unable to retrieve the temperature status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE_STATUS");
+
+        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
         {
-            manage_trace( deb, "Unable to retrieve the temperature status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE_STATUS");
-        }
-        else
-        {
-            manage_trace( deb, "Unable to retrieve the temperature status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORTEMPERATURE_STATUS");
             THROW_HW_ERROR(Error) << "Unable to retrieve the temperature status";
         }
     }    
@@ -2538,6 +2595,71 @@ enum Camera::Temperature_Status Camera::getTemperatureStatus(void)
 }
 
 //-----------------------------------------------------------------------------
+// Get a temperature status label from the status.
+//-----------------------------------------------------------------------------
+std::string Camera::getTemperatureStatusLabelFromStatus(enum Camera::Temperature_Status in_temperature_status)
+{
+    std::string label = "";
+
+    switch (in_temperature_status)
+    {
+        case Camera::Temperature_Status_Not_Supported : label = TEMPERATURE_STATUS_NOT_SUPPORTED; break;
+        case Camera::Temperature_Status_Normal        : label = TEMPERATURE_STATUS_NORMAL       ; break;
+        case Camera::Temperature_Status_Warning       : label = TEMPERATURE_STATUS_WARNING      ; break;
+        case Camera::Temperature_Status_Protection    : label = TEMPERATURE_STATUS_PROTECTION   ; break;
+	    default: break;
+    }
+
+    return label;
+}
+
+//-----------------------------------------------------------------------------
+// Get the temperature status label.
+//-----------------------------------------------------------------------------
+std::string Camera::getTemperatureStatusLabel(void)
+{
+    return getTemperatureStatusLabelFromStatus(getTemperatureStatus());
+}
+
+//=============================================================================
+// COOLER STATUS
+//=============================================================================
+//-----------------------------------------------------------------------------
+// Get a cooler status label from a status.
+//-----------------------------------------------------------------------------
+std::string Camera::getCoolerStatusLabelFromStatus(enum Camera::Cooler_Status in_cooler_status)
+{
+    std::string label = "";
+
+    switch (in_cooler_status)
+    {
+        case Camera::Cooler_Status_Not_Supported : label = COOLER_STATUS_NOT_SUPPORTED; break;
+        case Camera::Cooler_Status_Error4        : label = COOLER_STATUS_ERROR4       ; break;
+        case Camera::Cooler_Status_Error3        : label = COOLER_STATUS_ERROR3       ; break;
+        case Camera::Cooler_Status_Error2        : label = COOLER_STATUS_ERROR2       ; break;
+        case Camera::Cooler_Status_Error1        : label = COOLER_STATUS_ERROR1       ; break;
+        case Camera::Cooler_Status_None          : label = COOLER_STATUS_NONE         ; break;
+        case Camera::Cooler_Status_Off           : label = COOLER_STATUS_OFF          ; break;
+        case Camera::Cooler_Status_Ready         : label = COOLER_STATUS_READY        ; break;
+        case Camera::Cooler_Status_Busy          : label = COOLER_STATUS_BUSY         ; break;
+        case Camera::Cooler_Status_Always        : label = COOLER_STATUS_ALWAYS       ; break;
+        case Camera::Cooler_Status_Warning       : label = COOLER_STATUS_WARNING      ; break;
+
+	    default: break;
+    }
+
+    return label;
+}
+
+//-----------------------------------------------------------------------------
+/// Return the cooler status support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isCoolerStatusSupported(void)
+{
+    return !(getCoolerStatus() == Cooler_Status::Cooler_Status_Not_Supported);
+}
+
+//-----------------------------------------------------------------------------
 /// Return the current cooler status
 //-----------------------------------------------------------------------------
 enum Camera::Cooler_Status Camera::getCoolerStatus(void)
@@ -2553,13 +2675,10 @@ enum Camera::Cooler_Status Camera::getCoolerStatus(void)
     
     if( failed(err) )
 	{
-        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        manage_trace( deb, "Unable to retrieve the cooler status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLERSTATUS");
+
+        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
         {
-            manage_trace( deb, "Unable to retrieve the cooler status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLERSTATUS");
-        }
-        else
-        {
-            manage_trace( deb, "Unable to retrieve the cooler status", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORCOOLERSTATUS");
             THROW_HW_ERROR(Error) << "Unable to retrieve the cooler status";
         }
     }    
@@ -2588,6 +2707,116 @@ enum Camera::Cooler_Status Camera::getCoolerStatus(void)
     return result;
 }
 
+//-----------------------------------------------------------------------------
+// Get the cooler status label.
+//-----------------------------------------------------------------------------
+std::string Camera::getCoolerStatusLabel(void)
+{
+    return getCoolerStatusLabelFromStatus(getCoolerStatus());
+}
+
+//=============================================================================
+// HIGH DYNAMIC RANGE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the high dynamic range support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isHighDynamicRangeSupported(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    bool    Supported;
+    double  temp;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, &temp );
+    
+    if( failed(err) )
+	{
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            Supported = false;
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the high dynamic range mode", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the high dynamic range mode";
+        }
+    }    
+    else
+    {
+        Supported = true;
+    }
+
+    return Supported;
+}
+
+//-----------------------------------------------------------------------------
+/// get the current high dynamic range activation state
+//-----------------------------------------------------------------------------
+bool Camera::getHighDynamicRangeEnabled(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    double  temp;
+    bool    high_dynamic_range_mode = false;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, &temp );
+    
+    if( failed(err) )
+	{
+        manage_trace( deb, "Unable to retrieve the high dynamic range mode", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
+
+        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
+        {
+            THROW_HW_ERROR(Error) << "Unable to retrieve the high dynamic range mode";
+        }
+    }    
+    else
+    {
+        int high_dynamic_range = static_cast<int>(temp);
+
+        DEB_TRACE() << DEB_VAR1(high_dynamic_range);
+
+        if(high_dynamic_range == DCAMPROP_MODE__OFF) high_dynamic_range_mode = false; else
+        if(high_dynamic_range == DCAMPROP_MODE__ON ) high_dynamic_range_mode = true ; else
+        {
+            manage_trace( deb, "The read high dynamic range mode is incoherent!", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
+        }
+    }
+    
+    return high_dynamic_range_mode;
+}
+
+//-----------------------------------------------------------------------------
+/// set the current high dynamic range activation state
+//-----------------------------------------------------------------------------
+void Camera::setHighDynamicRangeEnabled(const bool & in_enabled)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+
+    double temp = (in_enabled) ? static_cast<double>(DCAMPROP_MODE__ON) : static_cast<double>(DCAMPROP_MODE__OFF);
+
+    // set the value
+    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, temp);
+
+    if( failed(err) )
+    {
+        manage_error( deb, "Cannot set high dynamic range mode", err, 
+                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, VALUE=%d", static_cast<int>(temp));
+        THROW_HW_ERROR(Error) << "Cannot set high dynamic range mode";
+    }
+
+    manage_trace( deb, "Changed high dynamic range mode", DCAMERR_NONE, NULL, "%s", ((in_enabled) ? "DCAMPROP_MODE__ON" : "DCAMPROP_MODE__OFF"));
+
+    // forcing the image pixel type to 16 bits
+    dcamex_setimagepixeltype( m_camera_handle, DCAM_PIXELTYPE_MONO16);
+}
+
+//=============================================================================
 //-----------------------------------------------------
 // Return the event control object
 //-----------------------------------------------------

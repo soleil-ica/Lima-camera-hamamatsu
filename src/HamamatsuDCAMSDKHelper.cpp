@@ -647,13 +647,14 @@ long Camera::dcamex_getbitsperchannel( HDCAM hdcam )    ///< [in] camera handle
     {
 	    switch (static_cast<int32>(GenericValue))
 	    {
-            case DCAM_PIXELTYPE_MONO8 : BitsNb = 8 ; break;
-            case DCAM_PIXELTYPE_MONO16: BitsNb = 16; break;
-            case DCAM_PIXELTYPE_MONO12: BitsNb = 12; break;
-            case DCAM_PIXELTYPE_RGB24 : BitsNb = 24; break;
-            case DCAM_PIXELTYPE_RGB48 : BitsNb = 48; break;
-            case DCAM_PIXELTYPE_BGR24 : BitsNb = 24; break;
-            case DCAM_PIXELTYPE_BGR48 : BitsNb = 48; break;
+            case DCAM_PIXELTYPE_MONO8  : BitsNb = 8 ; break;
+            case DCAM_PIXELTYPE_MONO16 : BitsNb = 16; break;
+            case DCAM_PIXELTYPE_MONO12 : BitsNb = 12; break;
+            case DCAM_PIXELTYPE_MONO12P: BitsNb = 12; break;
+            case DCAM_PIXELTYPE_RGB24  : BitsNb = 24; break;
+            case DCAM_PIXELTYPE_RGB48  : BitsNb = 48; break;
+            case DCAM_PIXELTYPE_BGR24  : BitsNb = 24; break;
+            case DCAM_PIXELTYPE_BGR48  : BitsNb = 48; break;
             default : 
             {
 			    DEB_ERROR() << "No compatible image type";
@@ -663,6 +664,45 @@ long Camera::dcamex_getbitsperchannel( HDCAM hdcam )    ///< [in] camera handle
     }
 
     return BitsNb;
+}
+
+//-----------------------------------------------------------------------------
+/// Set the image pixel type
+//-----------------------------------------------------------------------------
+void Camera::dcamex_setimagepixeltype( HDCAM hdcam    , ///< [in] camera handle
+                                       int   pixeltype) ///< [in] pixel type
+{
+	DEB_MEMBER_FUNCT();
+
+    DCAMERR err  ;
+	double  temp = static_cast<double>(pixeltype);
+	
+    err = dcamprop_setvalue( hdcam, DCAM_IDPROP_IMAGE_PIXELTYPE, temp );
+
+	if( failed(err) )
+	{
+        std::string description;
+        
+        switch (pixeltype)
+        {
+            case DCAM_PIXELTYPE_MONO8  : description = "DCAM_PIXELTYPE_MONO8"  ; break;
+            case DCAM_PIXELTYPE_MONO16 : description = "DCAM_PIXELTYPE_MONO16" ; break;
+            case DCAM_PIXELTYPE_MONO12 : description = "DCAM_PIXELTYPE_MONO12" ; break;
+            case DCAM_PIXELTYPE_MONO12P: description = "DCAM_PIXELTYPE_MONO12P"; break;
+            case DCAM_PIXELTYPE_RGB24  : description = "DCAM_PIXELTYPE_RGB24"  ; break;
+            case DCAM_PIXELTYPE_RGB48  : description = "DCAM_PIXELTYPE_RGB48"  ; break;
+            case DCAM_PIXELTYPE_BGR24  : description = "DCAM_PIXELTYPE_BGR24"  ; break;
+            case DCAM_PIXELTYPE_BGR48  : description = "DCAM_PIXELTYPE_BGR48"  ; break;
+            default : 
+            {
+		        DEB_ERROR() << "Unkown image type";
+		        THROW_HW_ERROR(Error) << "Unkown image type";
+            }
+        }
+
+        manage_error( deb, "Error in dcamex_setimagepixeltype", err, "dcamprop_setvalue()", "IDPROP=DCAM_IDPROP_IMAGE_PIXELTYPE");
+	    THROW_HW_ERROR(Error) << "Could not change the image pixel type to " << description;
+	}
 }
 
 //-----------------------------------------------------------------------------

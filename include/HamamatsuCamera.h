@@ -214,11 +214,29 @@ namespace lima
         void traceAllRoi(void);
         void checkingROIproperties(void);
         
-        double getSensorTemperature(bool & out_NotSupported); //< [out] attribut not supported by the camera
+        double getSensorTemperature(void);
 
-        enum Camera::Cooler_Mode        getCoolerMode       (void);
+        std::string getCoolerModeLabel        (void);
+        std::string getTemperatureStatusLabel (void);
+        std::string getCoolerStatusLabel      (void);
+        bool        getHighDynamicRangeEnabled(void);
+        void        setHighDynamicRangeEnabled(const bool & in_enabled);
+
+        bool isSensorTemperatureSupported(void);
+        bool isTemperatureStatusSupported(void);
+        bool isCoolerModeSupported       (void);
+        bool isCoolerStatusSupported     (void);
+        bool isHighDynamicRangeSupported (void);
+
+	private:
+        enum Camera::Cooler_Mode getCoolerMode(void);
+        std::string getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode);
+
         enum Camera::Temperature_Status getTemperatureStatus(void);
-        enum Camera::Cooler_Status      getCoolerStatus     (void);
+        std::string getTemperatureStatusLabelFromStatus(enum Camera::Temperature_Status in_temperature_status);
+
+        enum Camera::Cooler_Status getCoolerStatus(void);
+        std::string getCoolerStatusLabelFromStatus(enum Camera::Cooler_Status in_cooler_status);
 
 	//-----------------------------------------------------------------------------
 	private:
@@ -388,6 +406,9 @@ namespace lima
 		long   dcamex_getimageheight(const HDCAM hdcam ); ///< [in] camera handle
 
 		long   dcamex_getbitsperchannel( HDCAM hdcam );    ///< [in] camera handle
+
+        void   dcamex_setimagepixeltype( HDCAM hdcam   ,  ///< [in] camera handle
+                                        int   pixeltype); ///< [in] pixel type
 
         bool   dcamex_getfeatureinq( HDCAM          hdcam      ,        ///< [in ] camera handle
                                      const string   featurename,        ///< [in ] feature name
