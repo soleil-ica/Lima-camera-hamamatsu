@@ -32,13 +32,12 @@ using namespace lima::Hamamatsu;
 using namespace std;
 
 //-----------------------------------------------------------------------------
-const double Camera::g_OrcaPixelSize            = 6.5e-6;
-const int    Camera::g_DCAMFrameBufferSize      = 10    ;
-const int    Camera::g_DCAMStrMsgSize           = 256   ;
-const int    Camera::g_GetSubArrayDoNotUseView  = -1    ;
+const double Camera::g_orca_pixel_size            = 6.5e-6;
+const int    Camera::g_dcam_str_msg_size           = 256   ;
+const int    Camera::g_get_sub_array_do_not_use_view  = -1    ;
 
-const string Camera::g_TraceLineSeparator       = "--------------------------------------------------------------";
-const string Camera::g_TraceLittleLineSeparator = "--------------------------------";
+const string Camera::g_trace_line_separator       = "--------------------------------------------------------------";
+const string Camera::g_trace_little_line_separator = "--------------------------------";
 
 #define TRACE_LINE() DEB_ALWAYS() << __LINE__
 
@@ -73,7 +72,7 @@ const string Camera::g_TraceLittleLineSeparator = "-----------------------------
 #pragma warning( push )
 #pragma warning( disable : 4355) // temporary disable the warning cause by the use of this in the initializers
 
-Camera::Camera(const std::string& config_path, int camera_number)
+Camera::Camera(const std::string& config_path, int camera_number, int frame_buffer_size)
     : m_thread         (this) ,
       m_status         (Ready),
       m_image_number   (0)    ,
@@ -84,17 +83,17 @@ Camera::Camera(const std::string& config_path, int camera_number)
       m_fasttrigger    (0)    ,
       m_exp_time       (1.)   ,
 	  m_read_mode      (2)    ,
-	  m_lostFramesCount(0)    ,
+	  m_lost_frames_count(0)  ,
 	  m_fps            (0.0)  ,
-	  m_fpsUpdatePeriod(100)  ,
-      m_ViewExpTime    (NULL)   // array of exposure value by view
+	  m_view_exp_time  (NULL)   // array of exposure value by view
 
 #pragma warning( pop ) 
 {
     DEB_CONSTRUCTOR();
 
-    m_config_path   = config_path  ;
-    m_camera_number = camera_number;
+    m_config_path       = config_path  ;
+    m_camera_number     = camera_number;
+    m_frame_buffer_size = frame_buffer_size;
   
 	m_map_triggerMode[IntTrig       ] = "IntTrig"       ;
 	m_map_triggerMode[IntTrigMult   ] = "IntTrigMult"   ;
@@ -115,45 +114,45 @@ Camera::Camera(const std::string& config_path, int camera_number)
 
         // retrying the maximum number of views for this camera
         // Will be also used to know if W-View mode is possible
-        m_MaxViews = getMaxNumberofViews();
+        m_max_views = getMaxNumberofViews();
         
-        if(m_MaxViews > 1)
+        if(m_max_views > 1)
         {
-            m_ViewExpTime = new double[m_MaxViews];
+            m_view_exp_time = new double[m_max_views];
 
-            for(int ViewIndex = 0 ; ViewIndex < m_MaxViews ; ViewIndex++)
+            for(int view_index = 0 ; view_index < m_max_views ; view_index++)
             {
-                m_ViewExpTime[ViewIndex] = m_exp_time; // by default
+                m_view_exp_time[view_index] = m_exp_time; // by default
             }
         }
         else
         {
-            m_ViewExpTime = NULL;
+            m_view_exp_time = NULL;
         }
 
 		// --- BIN already set to 1,1 above.
 		// --- Hamamatsu sets the ROI by starting coordinates at 1 and not 0 !!!!
-		Size sizeMax;
-		getDetectorImageSize(sizeMax);
-		Roi aRoi = Roi(0,0, sizeMax.getWidth(), sizeMax.getHeight());
+		Size size_max;
+		getDetectorImageSize(size_max);
+		Roi a_roi = Roi(0,0, size_max.getWidth(), size_max.getHeight());
 
 		// Store max image size
-		m_maxImageWidth  = sizeMax.getWidth ();
-		m_maxImageHeight = sizeMax.getHeight();
+		m_max_image_width  = size_max.getWidth ();
+		m_max_image_height = size_max.getHeight();
 
 		// Display max image size
-		DEB_TRACE() << "Detector max width: " << m_maxImageWidth ;
-		DEB_TRACE() << "Detector max height:" << m_maxImageHeight;
+		DEB_TRACE() << "Detector max width: " << m_max_image_width ;
+		DEB_TRACE() << "Detector max height:" << m_max_image_height;
 
         // sets no view mode by default
-        m_ViewModeEnabled = false; // W-View mode with splitting image
-        m_ViewNumber      = 0    ; // number of W-Views
+        m_view_mode_enabled = false; // W-View mode with splitting image
+        m_view_number      = 0    ; // number of W-Views
 
         setViewMode(false, 0);
 
 		// --- setRoi applies both bin and roi
-		DEB_TRACE() << "Set the ROI to full frame: "<< aRoi;
-		setRoi(aRoi);	    
+		DEB_TRACE() << "Set the ROI to full frame: "<< a_roi;
+		setRoi(a_roi);	    
 	    
 		// --- Get the maximum exposure time allowed and set default
 		setExpTime(m_exp_time);
@@ -205,8 +204,8 @@ Camera::~Camera()
         }
 	}    
 
-    if(m_ViewExpTime != NULL)
-        delete [] m_ViewExpTime;
+    if(m_view_exp_time != NULL)
+        delete [] m_view_exp_time;
 
 	DEB_TRACE() << "Camera destructor done.";
 }
@@ -217,7 +216,7 @@ Camera::~Camera()
 void Camera::getDetectorMaxImageSize(Size& size) ///< [out] image dimensions
 {
 	DEB_MEMBER_FUNCT();
-	size = Size(m_maxImageWidth, m_maxImageHeight);
+	size = Size(m_max_image_width, m_max_image_height);
 }
 
 //-----------------------------------------------------------------------------
@@ -227,23 +226,23 @@ void Camera::getDetectorImageSize(Size& size) ///< [out] image dimensions
 {
     DEB_MEMBER_FUNCT();
     
-	int xmax =0;
-	int ymax =0;
+	int x_max =0;
+	int y_max =0;
     
     // --- Get the max image size of the detector
 	if (NULL!=m_camera_handle)
 	{
-		xmax = dcamex_getimagewidth (m_camera_handle);
-		ymax = dcamex_getimageheight(m_camera_handle);
+		x_max = dcamex_getimagewidth (m_camera_handle);
+		y_max = dcamex_getimageheight(m_camera_handle);
 	}
 
-	if ((0==xmax) || (0==ymax))
+	if ((0==x_max) || (0==y_max))
     {
         manage_error( deb, "Cannot get detector size");
         THROW_HW_ERROR(Error) << "Cannot get detector size";
     }     
 
-    size= Size(xmax, ymax);
+    size= Size(x_max, y_max);
 
     DEB_TRACE() << "Size (" << DEB_VAR2(size.getWidth(), size.getHeight()) << ")";
 }
@@ -257,11 +256,11 @@ void Camera::getImageType(ImageType& type)
 
 	type = Bpp16;
 
-	long bitsType =  dcamex_getbitsperchannel(m_camera_handle);
+	long bits_type =  dcamex_getbitsperchannel(m_camera_handle);
 	
-	if (0 != bitsType )
+	if (0 != bits_type )
 	{
-		switch( bitsType )
+		switch( bits_type )
 		{
 			case 8 :  type = Bpp8 ; break;
 			case 16:  type = Bpp16; break;
@@ -301,7 +300,7 @@ void Camera::setImageType(ImageType type)
 	}
 
 	DEB_TRACE() << "SetImageType: " << m_depth;
-	m_bytesPerPixel = m_depth / 8;
+	m_bytes_per_pixel = m_depth / 8;
 }
 
 //-----------------------------------------------------------------------------
@@ -310,7 +309,6 @@ void Camera::setImageType(ImageType type)
 void Camera::getDetectorType(string& type) ///< [out] detector type
 {
     DEB_MEMBER_FUNCT();
-    
     type = m_detector_type;
 }
 
@@ -360,51 +358,51 @@ void Camera::setTrigMode(TrigMode mode) ///< [in] trigger mode to set
 	// Get the dcam_sdk mode associated to the given LiMA TrigMode
     if(getTriggerMode(mode))
 	{
-        DCAMERR err           ;
-        int TriggerSource = -1;
-        int TriggerActive = -1;
-        int TriggerMode   = -1;
+        DCAMERR err;
+        int trigger_source = -1;
+        int trigger_active = -1;
+        int trigger_mode   = -1;
 
         if(mode == IntTrig)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__INTERNAL;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__EDGE    ;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__INTERNAL;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__EDGE    ;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
         }
         else
         if(mode == IntTrigMult)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__INTERNAL;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__EDGE    ;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__INTERNAL;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__EDGE    ;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
         }
         else
         if(mode == ExtTrigReadout)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__EXTERNAL   ;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__SYNCREADOUT;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__NORMAL      ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__EXTERNAL   ;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__SYNCREADOUT;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__NORMAL      ;
         }
         else
         if(mode == ExtTrigSingle)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__EDGE    ;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__START    ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__EDGE    ;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__START    ;
         }
         else
         if(mode == ExtTrigMult)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__EDGE    ;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__EDGE    ;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
         }
         else
         if(mode == ExtGate)
         {
-            TriggerSource = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
-            TriggerActive = DCAMPROP_TRIGGERACTIVE__LEVEL   ;
-            TriggerMode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
+            trigger_source = DCAMPROP_TRIGGERSOURCE__EXTERNAL;
+            trigger_active = DCAMPROP_TRIGGERACTIVE__LEVEL   ;
+            trigger_mode   = DCAMPROP_TRIGGER_MODE__NORMAL   ;
         }
         else
         {
@@ -413,37 +411,37 @@ void Camera::setTrigMode(TrigMode mode) ///< [in] trigger mode to set
         }
 
         // set the trigger source
-        if(TriggerSource != -1)
+        if(trigger_source != -1)
         {
-            err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGERSOURCE, static_cast<double>(TriggerSource));
+            err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGERSOURCE, static_cast<double>(trigger_source));
 	        if( failed(err) )
 	        {
                 manage_error( deb, "Cannot set trigger option", err, 
-                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGERSOURCE, VALUE=%d", TriggerSource);
+                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGERSOURCE, VALUE=%d", trigger_source);
                 THROW_HW_ERROR(Error) << "Cannot set trigger option";
 	        }
         }
 
         // set the trigger active
-        if(TriggerActive != -1)
+        if(trigger_active != -1)
         {
-	        err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGERACTIVE, static_cast<double>(TriggerActive));
+	        err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGERACTIVE, static_cast<double>(trigger_active));
 	        if( failed(err) )
 	        {
                 manage_error( deb, "Cannot set trigger option", err, 
-                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGERACTIVE, VALUE=%d", TriggerActive);
+                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGERACTIVE, VALUE=%d", trigger_active);
                 THROW_HW_ERROR(Error) << "Cannot set trigger option";
 	        }
         }
 
         // set the trigger mode
-        if(TriggerMode != -1)
+        if(trigger_mode != -1)
         {
-	        err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGER_MODE, static_cast<double>(TriggerMode));
+	        err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGER_MODE, static_cast<double>(trigger_mode));
 	        if( failed(err) )
 	        {
                 manage_error( deb, "Cannot set trigger option", err, 
-                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGER_MODE, VALUE=%d", TriggerMode);
+                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_TRIGGER_MODE, VALUE=%d", trigger_mode);
                 THROW_HW_ERROR(Error) << "Cannot set trigger option";
 	        }
         }
@@ -473,7 +471,7 @@ void Camera::setExpTime(double exp_time) ///< [in] exposure time to set
     DEB_MEMBER_FUNCT();
     DEB_PARAM() << DEB_VAR1(exp_time);
 
-    if(!m_ViewModeEnabled)
+    if(!m_view_mode_enabled)
     {
         DCAMERR err;
 
@@ -489,9 +487,9 @@ void Camera::setExpTime(double exp_time) ///< [in] exposure time to set
 
         m_exp_time = exp_time;
 
-        double tempexp_time;
-        getExpTime(tempexp_time);
-        manage_trace( deb, "Changed Exposure time", DCAMERR_NONE, NULL, "exp:%lf >> real:%lf", m_exp_time, tempexp_time);
+        double temp_exp_time;
+        getExpTime(temp_exp_time);
+        manage_trace( deb, "Changed Exposure time", DCAMERR_NONE, NULL, "exp:%lf >> real:%lf", m_exp_time, temp_exp_time);
     }
 }
 
@@ -506,7 +504,7 @@ void Camera::getExpTime(double& exp_time) ///< [out] current exposure time
 	double  exposure;
 
     // classic mode
-    if(!m_ViewModeEnabled)
+    if(!m_view_mode_enabled)
     {
         // get the binding
         err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_EXPOSURETIME, &exposure );
@@ -565,16 +563,16 @@ void Camera::getExposureTimeRange(double& min_expo,	///< [out] minimum exposure 
 {
     DEB_MEMBER_FUNCT();
 
-    FeatureInfos FeatureObj  ;
+    FeatureInfos feature_obj  ;
 
-	if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_EXPOSURETIME", DCAM_IDPROP_EXPOSURETIME, FeatureObj ) )
+	if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_EXPOSURETIME", DCAM_IDPROP_EXPOSURETIME, feature_obj ) )
 	{
         manage_error( deb, "Failed to get exposure time");
         THROW_HW_ERROR(Error) << "Failed to get exposure time";
 	}
 
-    min_expo = FeatureObj.m_min;
-    max_expo = FeatureObj.m_max;
+    min_expo = feature_obj.m_min;
+    max_expo = feature_obj.m_max;
 
     DEB_RETURN() << DEB_VAR2(min_expo, max_expo);
 }
@@ -675,12 +673,12 @@ void Camera::checkRoi(const Roi & set_roi, ///< [in]  Roi values to set
     DEB_MEMBER_FUNCT();
 	DEB_PARAM() << DEB_VAR1(set_roi);
 
-    Point topleft = set_roi.getTopLeft();
-    Size  size    = set_roi.getSize   ();
-    int   x       = topleft.x        * m_bin.getX();
-    int   y       = topleft.y        * m_bin.getY();
-    int   width   = size.getWidth () * m_bin.getX();
-    int   height  = size.getHeight() * m_bin.getY();
+    Point top_left = set_roi.getTopLeft();
+    Size  size     = set_roi.getSize   ();
+    int   x        = top_left.x        * m_bin.getX();
+    int   y        = top_left.y        * m_bin.getY();
+    int   width    = size.getWidth () * m_bin.getX();
+    int   height   = size.getHeight() * m_bin.getY();
 
 	if ((width == 0) && (height == 0))
 	{
@@ -693,10 +691,10 @@ void Camera::checkRoi(const Roi & set_roi, ///< [in]  Roi values to set
 
         // rounding the values
         // this code can be improved by checking the right-bottom corner but special cases will be rejected during dcamex_setsubarrayrect call
-        m_FeaturePosx.RoundValue (x     );
-        m_FeaturePosy.RoundValue (y     );
-        m_FeatureSizex.RoundValue(width );
-        m_FeatureSizey.RoundValue(height);
+        m_feature_pos_x.RoundValue (x     );
+        m_feature_pos_y.RoundValue (y     );
+        m_feature_size_x.RoundValue(width );
+        m_feature_size_y.RoundValue(height);
 
         DEB_TRACE() << "checkRoi() - after rounding :" << x << ", " << y << ", " << width << ", " << height;
 
@@ -740,7 +738,7 @@ void Camera::setRoi(const Roi & set_roi) ///< [in] New Roi values
     if ((set_roi_size.getWidth() == 0) && (set_roi_size.getHeight() == 0))
     {
 	    DEB_TRACE() << "Correcting 0x0 roi...";
-        set_roi_size = Size(m_maxImageWidth, m_maxImageHeight);
+        set_roi_size = Size(m_max_image_width, m_max_image_height);
     }
 
     Roi new_roi(set_roi_topleft, set_roi_size);
@@ -751,9 +749,9 @@ void Camera::setRoi(const Roi & set_roi) ///< [in] New Roi values
                                 << set_roi_size.getHeight();
 
     // Changing the ROI is not allowed in W-VIEW mode except for full frame
-    if(m_ViewModeEnabled)
+    if(m_view_mode_enabled)
     {
-        Roi FullFrameRoi(Point(0, 0), Size(m_maxImageWidth, m_maxImageHeight));
+        Roi FullFrameRoi(Point(0, 0), Size(m_max_image_width, m_max_image_height));
         if(new_roi != FullFrameRoi)
         {
             manage_error( deb, "Cannot change ROI in W-VIEW mode! Only full frame is supported.", DCAMERR_NONE, "setRoi");
@@ -762,7 +760,7 @@ void Camera::setRoi(const Roi & set_roi) ///< [in] New Roi values
     }
 
     // view mode activated and two views 
-    if((m_ViewModeEnabled) && (m_ViewNumber == 2))
+    if((m_view_mode_enabled) && (m_view_number == 2))
     {
         if (!dcamex_setsubarrayrect(m_camera_handle, 
                                     set_roi_topleft.x      , set_roi_topleft.y         ,
@@ -787,7 +785,7 @@ void Camera::setRoi(const Roi & set_roi) ///< [in] New Roi values
         if (!dcamex_setsubarrayrect(m_camera_handle, 
                                     set_roi_topleft.x      , set_roi_topleft.y       ,
                                     set_roi_size.getWidth(), set_roi_size.getHeight(),
-                                    g_GetSubArrayDoNotUseView))
+                                    g_get_sub_array_do_not_use_view))
         {
             manage_error( deb, "Cannot set detector ROI!");
             THROW_HW_ERROR(Error) << "Cannot set detector ROI!";
@@ -813,7 +811,7 @@ void Camera::getRoi(Roi & hw_roi) ///< [out] Roi values
     }    
 
     // view mode activated and two views 
-    if((m_ViewModeEnabled) && (m_ViewNumber == 2))
+    if((m_view_mode_enabled) && (m_view_number == 2))
     {
         height *= 2; // height correction to get the global ROI (two views height)
     }
@@ -839,9 +837,9 @@ void Camera::traceAllRoi(void)
 
 	int32 left, top, width, height;
 
-    if(!m_ViewModeEnabled)
+    if(!m_view_mode_enabled)
     {
-        if (!dcamex_getsubarrayrect( m_camera_handle, left, top, width,	height, g_GetSubArrayDoNotUseView ) )
+        if (!dcamex_getsubarrayrect( m_camera_handle, left, top, width,	height, g_get_sub_array_do_not_use_view ) )
         {
             manage_error( deb, "Cannot get detector ROI");
         }    
@@ -852,15 +850,15 @@ void Camera::traceAllRoi(void)
     }
     else
     {
-        for(int ViewIndex = 0 ; ViewIndex < m_MaxViews ; ViewIndex++)
+        for(int view_index = 0 ; view_index < m_max_views ; view_index++)
         {
-            if (!dcamex_getsubarrayrect( m_camera_handle, left, top, width,	height, ViewIndex ) )
+            if (!dcamex_getsubarrayrect( m_camera_handle, left, top, width,	height, view_index ) )
             {
                 manage_error( deb, "Cannot get detector View ROI");
             }    
             else
             {
-                DEB_TRACE() << "View Roi (" << (ViewIndex+1) << "): (" << left << ", " << top << ", " <<  width << ", " <<  height << ")";
+                DEB_TRACE() << "View Roi (" << (view_index+1) << "): (" << left << ", " << top << ", " <<  width << ", " <<  height << ")";
             }
         }
     }
@@ -948,21 +946,22 @@ void Camera::getBin(Bin & hw_bin) ///< [out] binning values object
 @return true if the given binning value exists
 */
 //-----------------------------------------------------------------------------
-bool Camera::isBinningSupported(const int binValue)	///< [in] binning value to chck for
+bool Camera::isBinningSupported(const int bin_value)	///< [in] binning value to chck for
 {
 	DEB_MEMBER_FUNCT();
 
-	bool bFound = false;
+	bool found = false;
+
 	for (unsigned int i=0; i<m_vectBinnings.size(); i++)
 	{
-		if (binValue == m_vectBinnings.at(i))
+		if (bin_value == m_vectBinnings.at(i))
 		{
-			bFound = true;
+			found = true;
 			break;
 		}
 	}
 
-	return bFound;
+	return found;
 }
 
 //-----------------------------------------------------------------------------
@@ -971,17 +970,17 @@ bool Camera::isBinningSupported(const int binValue)	///< [in] binning value to c
 @return the corresponding mode
 */
 //-----------------------------------------------------------------------------
-int32 Camera::GetBinningMode(const int binValue)	///< [in] binning value to chck for
+int32 Camera::GetBinningMode(const int bin_value)	///< [in] binning value to chck for
 {
 	DEB_MEMBER_FUNCT();
     
-    if(binValue == 1 ) return DCAMPROP_BINNING__1 ;
-    if(binValue == 2 ) return DCAMPROP_BINNING__2 ;
-    if(binValue == 4 ) return DCAMPROP_BINNING__4 ;
-    if(binValue == 8 ) return DCAMPROP_BINNING__8 ;
-    if(binValue == 16) return DCAMPROP_BINNING__16;
+    if(bin_value == 1 ) return DCAMPROP_BINNING__1 ;
+    if(bin_value == 2 ) return DCAMPROP_BINNING__2 ;
+    if(bin_value == 4 ) return DCAMPROP_BINNING__4 ;
+    if(bin_value == 8 ) return DCAMPROP_BINNING__8 ;
+    if(bin_value == 16) return DCAMPROP_BINNING__16;
 
-    manage_error( deb, "Incoherent binning value - no mode found.", DCAMERR_NONE, "GetBinningMode", "binning value = %d", binValue);
+    manage_error( deb, "Incoherent binning value - no mode found.", DCAMERR_NONE, "GetBinningMode", "binning value = %d", bin_value);
     THROW_HW_ERROR(Error) << "Incoherent binning value - no mode found.";
 }
 
@@ -991,17 +990,17 @@ int32 Camera::GetBinningMode(const int binValue)	///< [in] binning value to chck
 @return the corresponding mode
 */
 //-----------------------------------------------------------------------------
-int Camera::GetBinningFromMode(const int32 binMode)	///< [in] binning mode to chck for
+int Camera::GetBinningFromMode(const int32 bin_mode)	///< [in] binning mode to chck for
 {
 	DEB_MEMBER_FUNCT();
     
-    if(binMode == DCAMPROP_BINNING__1 ) return 1 ;
-    if(binMode == DCAMPROP_BINNING__2 ) return 2 ;
-    if(binMode == DCAMPROP_BINNING__4 ) return 4 ;
-    if(binMode == DCAMPROP_BINNING__8 ) return 8 ;
-    if(binMode == DCAMPROP_BINNING__16) return 16;
+    if(bin_mode == DCAMPROP_BINNING__1 ) return 1 ;
+    if(bin_mode == DCAMPROP_BINNING__2 ) return 2 ;
+    if(bin_mode == DCAMPROP_BINNING__4 ) return 4 ;
+    if(bin_mode == DCAMPROP_BINNING__8 ) return 8 ;
+    if(bin_mode == DCAMPROP_BINNING__16) return 16;
 
-    manage_error( deb, "Incoherent binning mode.", DCAMERR_NONE, "GetBinningFromMode", "binning mode = %d", binMode);
+    manage_error( deb, "Incoherent binning mode.", DCAMERR_NONE, "GetBinningFromMode", "binning mode = %d", bin_mode);
     THROW_HW_ERROR(Error) << "Incoherent binning mode.";
 }
 
@@ -1025,8 +1024,8 @@ void Camera::getPixelSize(double& sizex,	///< [out] horizontal pixel size
 {
     DEB_MEMBER_FUNCT();
     
-    sizex = Camera::g_OrcaPixelSize;
-    sizey = Camera::g_OrcaPixelSize;
+    sizex = Camera::g_orca_pixel_size;
+    sizey = Camera::g_orca_pixel_size;
     DEB_RETURN() << DEB_VAR2(sizex, sizey); 
 }
 
@@ -1046,7 +1045,7 @@ void Camera::initialiseController()
 {
     DEB_MEMBER_FUNCT();
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
 
 	// Create the list of available binning modes from camera capabilities
     DCAMERR             err   ;
@@ -1068,22 +1067,22 @@ void Camera::initialiseController()
     //---------------------------------------------------------------------
 	// Create the list of available binning modes from camera capabilities
     {
-        FeatureInfos FeatureObj;
+        FeatureInfos feature_obj;
 
-	    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_BINNING", DCAM_IDPROP_BINNING, FeatureObj ) )
+	    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_BINNING", DCAM_IDPROP_BINNING, feature_obj ) )
 	    {
             manage_error( deb, "Failed to get binning modes");
             THROW_HW_ERROR(Error) << "Failed to get binning modes";
 	    }
 
-    	DEB_TRACE() << g_TraceLineSeparator.c_str();
-        FeatureObj.traceModePossibleValues();
+    	DEB_TRACE() << g_trace_line_separator.c_str();
+        feature_obj.traceModePossibleValues();
 
-        if(FeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__1 ))) m_vectBinnings.push_back(1 );
-        if(FeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__2 ))) m_vectBinnings.push_back(2 );
-        if(FeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__4 ))) m_vectBinnings.push_back(4 );
-        if(FeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__8 ))) m_vectBinnings.push_back(8 );
-        if(FeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__16))) m_vectBinnings.push_back(16);
+        if(feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__1 ))) m_vectBinnings.push_back(1 );
+        if(feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__2 ))) m_vectBinnings.push_back(2 );
+        if(feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__4 ))) m_vectBinnings.push_back(4 );
+        if(feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__8 ))) m_vectBinnings.push_back(8 );
+        if(feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_BINNING__16))) m_vectBinnings.push_back(16);
 
         if(m_vectBinnings.size() == 0)
         {
@@ -1108,74 +1107,74 @@ void Camera::initialiseController()
 
     //---------------------------------------------------------------------
 	// Create the list of available trigger modes from camera capabilities
-    FeatureInfos TriggerSourceFeatureObj;
-    FeatureInfos TriggerActiveFeatureObj;
-    FeatureInfos TriggerModeFeatureObj  ;
+    FeatureInfos trigger_source_feature_obj;
+    FeatureInfos trigger_active_feature_obj;
+    FeatureInfos trigger_mode_feature_obj  ;
 
     // trigger source
-    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERSOURCE", DCAM_IDPROP_TRIGGERSOURCE, TriggerSourceFeatureObj ) )
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERSOURCE", DCAM_IDPROP_TRIGGERSOURCE, trigger_source_feature_obj ) )
     {
         manage_error( deb, "Failed to get trigger source modes");
         THROW_HW_ERROR(Error) << "Failed to get trigger source modes";
     }
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
-    TriggerSourceFeatureObj.traceModePossibleValues();
+	DEB_TRACE() << g_trace_line_separator.c_str();
+    trigger_source_feature_obj.traceModePossibleValues();
 
     // trigger active
-    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERACTIVE", DCAM_IDPROP_TRIGGERACTIVE, TriggerActiveFeatureObj ) )
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERACTIVE", DCAM_IDPROP_TRIGGERACTIVE, trigger_active_feature_obj ) )
     {
         manage_error( deb, "Failed to get trigger active modes");
         THROW_HW_ERROR(Error) << "Failed to get trigger active modes";
     }
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
-    TriggerActiveFeatureObj.traceModePossibleValues();
+	DEB_TRACE() << g_trace_line_separator.c_str();
+    trigger_active_feature_obj.traceModePossibleValues();
 
     // trigger mode
-    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGER_MODE", DCAM_IDPROP_TRIGGER_MODE, TriggerModeFeatureObj ) )
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGER_MODE", DCAM_IDPROP_TRIGGER_MODE, trigger_mode_feature_obj ) )
     {
         manage_error( deb, "Failed to get trigger mode modes");
         THROW_HW_ERROR(Error) << "Failed to get trigger mode modes";
     }
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
-    TriggerModeFeatureObj.traceModePossibleValues();
+	DEB_TRACE() << g_trace_line_separator.c_str();
+    trigger_mode_feature_obj.traceModePossibleValues();
 
     // IntTrig
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__INTERNAL ))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE     ))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL    ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__INTERNAL ))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE     ))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL    ))))
         m_map_trig_modes[IntTrig] = true;
 
     // IntTrigMult
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__INTERNAL ))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE     ))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL    ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__INTERNAL ))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE     ))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL    ))))
         m_map_trig_modes[IntTrigMult] = true;
 
     // ExtTrigReadout
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL   ))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__SYNCREADOUT))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL      ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL   ))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__SYNCREADOUT))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL      ))))
         m_map_trig_modes[ExtTrigReadout] = true;
 
     // ExtTrigSingle
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE    ))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__START    ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE    ))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__START    ))))
         m_map_trig_modes[ExtTrigSingle] = true;
 
     // ExtTrigMult
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE    ))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL   ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__EDGE    ))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL   ))))
         m_map_trig_modes[ExtTrigMult] = true;
 
     // ExtGate
-    if((TriggerSourceFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
-       (TriggerActiveFeatureObj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__LEVEL   ))) &&
-       (TriggerModeFeatureObj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL   ))))
+    if((trigger_source_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERSOURCE__EXTERNAL))) &&
+       (trigger_active_feature_obj.checkifValueExists(static_cast<double>(DCAMPROP_TRIGGERACTIVE__LEVEL   ))) &&
+       (trigger_mode_feature_obj.checkifValueExists  (static_cast<double>(DCAMPROP_TRIGGER_MODE__NORMAL   ))))
         m_map_trig_modes[ExtGate] = true;
 
 	// Display obtained values - Trigger modes
@@ -1195,32 +1194,32 @@ void Camera::initialiseController()
     //---------------------------------------------------------------------
 	// Retrieve exposure time
     {
-        FeatureInfos FeatureObj;
+        FeatureInfos feature_obj;
 
-	    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_EXPOSURETIME", DCAM_IDPROP_EXPOSURETIME, FeatureObj ) )
+	    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_EXPOSURETIME", DCAM_IDPROP_EXPOSURETIME, feature_obj ) )
 	    {
             manage_error( deb, "Failed to get exposure time");
             THROW_HW_ERROR(Error) << "Failed to get exposure time";
 	    }
 
-        m_exp_time_max = FeatureObj.m_max;
+        m_exp_time_max = feature_obj.m_max;
 
 	    // Display obtained values - Exposure time
-	    DEB_TRACE() << "Min exposure time: " << FeatureObj.m_min;
-	    DEB_TRACE() << "Max exposure time: " << FeatureObj.m_max;
+	    DEB_TRACE() << "Min exposure time: " << feature_obj.m_min;
+	    DEB_TRACE() << "Max exposure time: " << feature_obj.m_max;
     }
 
     //---------------------------------------------------------------------
 	// Checking ROI properties
     {
-        DEB_TRACE() << g_TraceLineSeparator.c_str();
-        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHPOS" , DCAM_IDPROP_SUBARRAYHPOS , &m_FeaturePosx );
-    	DEB_TRACE() << g_TraceLineSeparator.c_str();
-        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVPOS" , DCAM_IDPROP_SUBARRAYVPOS , &m_FeaturePosy );
-    	DEB_TRACE() << g_TraceLineSeparator.c_str();
-        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE", DCAM_IDPROP_SUBARRAYHSIZE, &m_FeatureSizex);
-    	DEB_TRACE() << g_TraceLineSeparator.c_str();
-        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE", DCAM_IDPROP_SUBARRAYVSIZE, &m_FeatureSizey);
+        DEB_TRACE() << g_trace_line_separator.c_str();
+        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHPOS" , DCAM_IDPROP_SUBARRAYHPOS , &m_feature_pos_x );
+    	DEB_TRACE() << g_trace_line_separator.c_str();
+        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVPOS" , DCAM_IDPROP_SUBARRAYVPOS , &m_feature_pos_y );
+    	DEB_TRACE() << g_trace_line_separator.c_str();
+        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE", DCAM_IDPROP_SUBARRAYHSIZE, &m_feature_size_x);
+    	DEB_TRACE() << g_trace_line_separator.c_str();
+        traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE", DCAM_IDPROP_SUBARRAYVSIZE, &m_feature_size_y);
     }
 }
 
@@ -1250,43 +1249,43 @@ bool Camera::getTriggerMode(const TrigMode trig_mode) const ///< [in]  lima trig
 @remark possible values are 1 or 2
 */
 //-----------------------------------------------------------------------------
-void Camera::setReadoutSpeed(const short int readoutSpeed) ///< [in] new readout speed
+void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readout speed
 {
 	DEB_MEMBER_FUNCT();
-	DEB_PARAM() << DEB_VAR1(readoutSpeed);
+	DEB_PARAM() << DEB_VAR1(readout_speed);
 
     DCAMERR err;
 
     // set the readout speed
-	err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_READOUTSPEED, static_cast<double>(readoutSpeed) );
+	err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_READOUTSPEED, static_cast<double>(readout_speed) );
 	if( failed(err) )
 	{
         manage_error( deb, "Failed to set readout speed", err, 
-                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_SUBARRAYVPOS, VALUE=%d",static_cast<int>(readoutSpeed));
+                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_SUBARRAYVPOS, VALUE=%d",static_cast<int>(readout_speed));
         THROW_HW_ERROR(Error) << "Failed to set readout speed";
 	}
 
-	m_read_mode = readoutSpeed;
+	m_read_mode = readout_speed;
 }
 
 //-----------------------------------------------------------------------------
 /// Get the readout speed value
 //-----------------------------------------------------------------------------
-void Camera::getReadoutSpeed(short int& readoutSpeed)		///< [out] current readout speed
+void Camera::getReadoutSpeed(short int& readout_speed)		///< [out] current readout speed
 {
 	DEB_MEMBER_FUNCT();
 	
-	readoutSpeed = m_read_mode;
+	readout_speed = m_read_mode;
 }
 
 //-----------------------------------------------------------------------------
 /// Get the lost frames value
 //-----------------------------------------------------------------------------
-void Camera::getLostFrames(unsigned long int& lostFrames)	///< [out] current lost frames
+void Camera::getLostFrames(unsigned long int& lost_frames)	///< [out] current lost frames
 {
 	DEB_MEMBER_FUNCT();
 
-	lostFrames = m_lostFramesCount;
+	lost_frames = m_lost_frames_count;
 }
 
 //-----------------------------------------------------------------------------
@@ -1316,10 +1315,10 @@ void Camera::prepareAcq()
 void Camera::startAcq()
 {
     DEB_MEMBER_FUNCT();
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
 
     DCAMERR err              = DCAMERR_NONE;
-    int32   number_of_buffer = Camera::g_DCAMFrameBufferSize;
+    int32   number_of_buffer = m_frame_buffer_size;
 	long    status;
 
     traceAllRoi();
@@ -1368,7 +1367,7 @@ void Camera::startAcq()
 void Camera::stopAcq()
 {
     DEB_MEMBER_FUNCT();
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
 
     execStopAcq();
 
@@ -1395,7 +1394,7 @@ Camera::CameraThread::CameraThread(Camera * cam)
 {
 	DEB_MEMBER_FUNCT();
 	m_force_stop = false;
-    m_waitHandle = NULL ;
+    m_wait_handle = NULL ;
 	DEB_TRACE() << "DONE";
 }
 
@@ -1501,13 +1500,13 @@ void Camera::CameraThread::checkStatusBeforeCapturing() const
 //! Camera::CameraThread::createWaitHandle()
 // throws an exception in case of problem
 //---------------------------------------------------------------------------------------
-void Camera::CameraThread::createWaitHandle(HDCAMWAIT & waitHandle) const
+void Camera::CameraThread::createWaitHandle(HDCAMWAIT & wait_handle) const
 {
 	DEB_MEMBER_FUNCT();
 
     DCAMERR err;
 
-    waitHandle = NULL;
+    wait_handle = NULL;
 
 	// open wait handle
 	DCAMWAIT_OPEN waitOpenHandle;
@@ -1525,7 +1524,7 @@ void Camera::CameraThread::createWaitHandle(HDCAMWAIT & waitHandle) const
 	}
 	else
 	{
-		waitHandle = waitOpenHandle.hwait; // after this, no need to keep the waitopen structure, freed by the stack
+		wait_handle = waitOpenHandle.hwait; // after this, no need to keep the waitopen structure, freed by the stack
     }
 }
 
@@ -1533,20 +1532,20 @@ void Camera::CameraThread::createWaitHandle(HDCAMWAIT & waitHandle) const
 //! Camera::CameraThread::releaseWaitHandle()
 // does not throw exception in case of problem but trace an error.
 //---------------------------------------------------------------------------------------
-void Camera::CameraThread::releaseWaitHandle(HDCAMWAIT & waitHandle) const
+void Camera::CameraThread::releaseWaitHandle(HDCAMWAIT & wait_handle) const
 {
 	DEB_MEMBER_FUNCT();
 
     DCAMERR err;
 
-    err = dcamwait_close( waitHandle );
+    err = dcamwait_close( wait_handle );
 
 	if( failed(err) )
 	{
         static_manage_error( m_cam, deb, "Cannot release the wait handle", err, "dcamwait_close");
 	}
     
-    waitHandle = NULL;
+    wait_handle = NULL;
 }
 
 //---------------------------------------------------------------------------------------
@@ -1559,11 +1558,11 @@ void Camera::CameraThread::abortCapture(void)
 
     DCAMERR err = DCAMERR_NONE;
 
-	m_cam->m_mutexForceStop.lock();
+	m_cam->m_mutex_force_stop.lock();
 
-    if(m_waitHandle != NULL)
+    if(m_wait_handle != NULL)
     {
-        err = dcamwait_abort( m_waitHandle );
+        err = dcamwait_abort( m_wait_handle );
     }
 
     if( failed(err) )
@@ -1572,15 +1571,15 @@ void Camera::CameraThread::abortCapture(void)
     }
 
 	m_force_stop = true;
-    m_cam->m_mutexForceStop.unlock();
+    m_cam->m_mutex_force_stop.unlock();
 }
 
 //---------------------------------------------------------------------------------------
 //! Camera::CameraThread::getTransfertInfo()
 // throws an exception in case of problem
 //---------------------------------------------------------------------------------------
-void Camera::CameraThread::getTransfertInfo(int32 & frameIndex,
-                                            int32 & frameCount)
+void Camera::CameraThread::getTransfertInfo(int32 & frame_index,
+                                            int32 & frame_count)
 {
     DEB_MEMBER_FUNCT();
 
@@ -1603,8 +1602,8 @@ void Camera::CameraThread::getTransfertInfo(int32 & frameIndex,
     }
     else
     {
-        frameIndex = transferinfo.nNewestFrameIndex;
-        frameCount = transferinfo.nFrameCount      ;
+        frame_index = transferinfo.nNewestFrameIndex;
+        frame_count = transferinfo.nFrameCount      ;
     }
 }
 
@@ -1615,13 +1614,13 @@ void Camera::CameraThread::execStartAcq()
 {
 	DEB_MEMBER_FUNCT();
 
-    DCAMERR   err         = DCAMERR_NONE;
-    bool      continueAcq = true        ;
-    Timestamp T0          ;
-    Timestamp T1          ;
-    Timestamp DeltaT      ;
+    DCAMERR   err          = DCAMERR_NONE;
+    bool      continue_acq = true        ;
+    Timestamp T0    ;
+    Timestamp T1    ;
+    Timestamp DeltaT;
 
-	DEB_TRACE() << m_cam->g_TraceLineSeparator.c_str();
+	DEB_TRACE() << m_cam->g_trace_line_separator.c_str();
 	DEB_TRACE() << "CameraThread::execStartAcq - BEGIN";
     setStatus(CameraThread::Exposure);
 
@@ -1638,14 +1637,14 @@ void Camera::CameraThread::execStartAcq()
     {
     	DEB_TRACE() << "View mode activated";
 
-        int    ViewIndex   = 0;
-	    double Viewexposure;
+        int    view_index   = 0;
+	    double view_exposure;
 
-        while(ViewIndex < m_cam->m_MaxViews)
+        while(view_index < m_cam->m_max_views)
         {
-            m_cam->getViewExpTime(ViewIndex, Viewexposure);
-            DEB_TRACE() << "View " << (ViewIndex+1) << " exposure : " << Viewexposure;
-            ViewIndex++;
+            m_cam->getViewExpTime(view_index, view_exposure);
+            DEB_TRACE() << "View " << (view_index+1) << " exposure : " << view_exposure;
+            view_index++;
         }
     }
     else
@@ -1661,7 +1660,7 @@ void Camera::CameraThread::execStartAcq()
     checkStatusBeforeCapturing();
 
     // Create the wait handle
-    createWaitHandle(m_waitHandle);
+    createWaitHandle(m_wait_handle);
 
 	// Start the real capture (this function returns immediately)
 	err = dcamcap_start( m_cam->m_camera_handle, DCAMCAP_START_SEQUENCE );
@@ -1669,7 +1668,7 @@ void Camera::CameraThread::execStartAcq()
     if( failed(err) )
 	{
 	    dcamcap_stop     ( m_cam->m_camera_handle ); // Stop the acquisition
-        releaseWaitHandle( m_waitHandle           );        
+        releaseWaitHandle( m_wait_handle           );        
     	dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
         setStatus        ( CameraThread::Fault    );
 
@@ -1678,28 +1677,30 @@ void Camera::CameraThread::execStartAcq()
         THROW_HW_ERROR(Error) << "Frame capture failed";
 	}
 
+    //-----------------------------------------------------------------------------
 	// Transfer the images as they are beeing captured from dcam_sdk buffer to Lima
-	m_cam->m_lostFramesCount = 0;
+    //-----------------------------------------------------------------------------
+    // Timestamp before DCAM "snapshot"
+	T0 = Timestamp::now();
+
+	m_cam->m_lost_frames_count = 0;
 
     int32 lastFrameCount = 0 ;
-    int32 frameCount     = 0 ;
+    int32 frame_count     = 0 ;
     int32 lastFrameIndex = -1;
-    int32 frameIndex     = 0 ;
+    int32 frame_index     = 0 ;
 	
 	// Main acquisition loop
-    while (	( continueAcq )	&&
+    while (	( continue_acq )	&&
             ( (0==m_cam->m_nb_frames) || (m_cam->m_image_number < m_cam->m_nb_frames) ) )
     {
         setStatus(CameraThread::Exposure);
-
-        // Timestamp before DCAM "snapshot"
-		T0 = Timestamp::now();
 
 		// Check first if acq. has been stopped
 		if (m_force_stop)
         {
 			//abort the current acquisition
-			continueAcq  = false;
+			continue_acq  = false;
 			m_force_stop = false;
 			continue;
         }
@@ -1713,7 +1714,7 @@ void Camera::CameraThread::execStartAcq()
 		waitstart.timeout	= DCAMWAIT_TIMEOUT_INFINITE;
 
 		// wait image
-		err = dcamwait_start( m_waitHandle, &waitstart );
+		err = dcamwait_start( m_wait_handle, &waitstart );
 
         if( failed(err) )
 		{
@@ -1721,14 +1722,14 @@ void Camera::CameraThread::execStartAcq()
 			if (DCAMERR_ABORT == err)
 			{
 				DEB_TRACE() << "DCAMERR_ABORT";
-				continueAcq = false;
+				continue_acq = false;
 				continue;
 			}
 			else 
 			if (DCAMERR_TIMEOUT == err)
 			{
 	            dcamcap_stop     ( m_cam->m_camera_handle ); // Stop the acquisition
-                releaseWaitHandle( m_waitHandle           );        
+                releaseWaitHandle( m_wait_handle           );        
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
@@ -1741,13 +1742,13 @@ void Camera::CameraThread::execStartAcq()
 			if(( DCAMERR_LOSTFRAME == err) || (DCAMERR_MISSINGFRAME_TROUBLE == err) )
 			{
                 static_manage_error( m_cam, deb, "Error during the frame capture wait", err, "dcamwait_start");
-				++m_cam->m_lostFramesCount;
+				++m_cam->m_lost_frames_count;
 				continue;
             }
             else
 			{					
 	            dcamcap_stop     ( m_cam->m_camera_handle ); // Stop the acquisition
-                releaseWaitHandle( m_waitHandle           );        
+                releaseWaitHandle( m_wait_handle           );        
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
@@ -1762,7 +1763,7 @@ void Camera::CameraThread::execStartAcq()
 			if (waitstart.eventhappened & DCAMWAIT_CAPEVENT_STOPPED)
 			{
 				DEB_TRACE() << "DCAM_EVENT_CAPTUREEND";
-				continueAcq = false;
+				continue_acq = false;
 				continue;
 			}
 		}
@@ -1770,7 +1771,7 @@ void Camera::CameraThread::execStartAcq()
 		if (m_force_stop)
 		{
 			//abort the current acqusition
-			continueAcq  = false;
+			continue_acq  = false;
 			m_force_stop = false;
 			break;
 		}
@@ -1780,22 +1781,22 @@ void Camera::CameraThread::execStartAcq()
 		
 		int32 deltaFrames = 0;
 
-        getTransfertInfo(frameIndex, frameCount);
+        getTransfertInfo(frame_index, frame_count);
 
         // manage the frame info
         {
-			deltaFrames = frameCount-lastFrameCount;
-        	DEB_TRACE() << g_TraceLittleLineSeparator.c_str();
+			deltaFrames = frame_count-lastFrameCount;
+        	DEB_TRACE() << g_trace_little_line_separator.c_str();
 			DEB_TRACE() << "m_image_number > "  << m_cam->m_image_number 
 			            << " lastFrameIndex > " << lastFrameIndex
-			            << " frameIndex     > " << frameIndex
-			            << " frameCount     > " << frameCount 
+			            << " frame_index     > " << frame_index
+			            << " frame_count     > " << frame_count 
                         << " (delta: " << deltaFrames << ")";
 
-			if (0 == frameCount)
+			if (0 == frame_count)
 			{
 	            dcamcap_stop     ( m_cam->m_camera_handle ); // Stop the acquisition
-                releaseWaitHandle( m_waitHandle           );        
+                releaseWaitHandle( m_wait_handle           );        
     	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
                 setStatus        ( CameraThread::Fault    );
 
@@ -1804,18 +1805,18 @@ void Camera::CameraThread::execStartAcq()
                 REPORT_EVENT(errorText);
 				THROW_HW_ERROR(Error) << "No image captured.";
 			}
-			if (deltaFrames > Camera::g_DCAMFrameBufferSize)
+			if (deltaFrames > m_cam->m_frame_buffer_size)
 			{
-				m_cam->m_lostFramesCount += deltaFrames;
-				DEB_TRACE() << "deltaFrames > Camera::g_DCAMFrameBufferSize (" << deltaFrames << ")";
+				m_cam->m_lost_frames_count += deltaFrames;
+				DEB_TRACE() << "deltaFrames > m_frame_buffer_size (" << deltaFrames << ")";
 			}
-			lastFrameCount = frameCount;
+			lastFrameCount = frame_count;
 		}
 
 		// Check if acquisition was stopped & abort the current acqusition
 		if (m_force_stop)
 		{
-			continueAcq  = false;
+			continue_acq  = false;
 			m_force_stop = false;
 			break;
 		}
@@ -1824,38 +1825,37 @@ void Camera::CameraThread::execStartAcq()
 
         try
         {
-            m_cam->m_mutexForceStop.lock();
+            m_cam->m_mutex_force_stop.lock();
 
             // Copy frames from DCAM_SDK to LiMa
-            nbFrameToCopy  = (deltaFrames < Camera::g_DCAMFrameBufferSize) ? deltaFrames : Camera::g_DCAMFrameBufferSize; // if more than Camera::g_DCAMFrameBufferSize have arrived
+            nbFrameToCopy  = (deltaFrames < m_cam->m_frame_buffer_size) ? deltaFrames : m_cam->m_frame_buffer_size; // if more than m_frame_buffer_size have arrived
 
-            continueAcq    = copyFrames( (lastFrameIndex+1)% Camera::g_DCAMFrameBufferSize, // index of the first image to copy from the ring buffer
-                                          nbFrameToCopy                                   ,
-                                          buffer_mgr                                      );
-            lastFrameIndex = frameIndex;
+            continue_acq    = copyFrames( (lastFrameIndex+1)% m_cam->m_frame_buffer_size, // index of the first image to copy from the ring buffer
+                                          nbFrameToCopy,
+                                          buffer_mgr);
+            lastFrameIndex = frame_index;
         }
         catch (...)
         {
 		    // be sure to unlock the mutex before throwing the exception!
-		    m_cam->m_mutexForceStop.unlock();
+		    m_cam->m_mutex_force_stop.unlock();
 
             dcamcap_stop     ( m_cam->m_camera_handle ); // Stop the acquisition
-            releaseWaitHandle( m_waitHandle           );        
+            releaseWaitHandle( m_wait_handle           );        
 	        dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
             setStatus        ( CameraThread::Fault    );
 
             throw;
         }
 
-	    m_cam->m_mutexForceStop.unlock();
+	    m_cam->m_mutex_force_stop.unlock();
 		
 		// Update fps
-		{
-			T1 = Timestamp::now();
+		T1     = Timestamp::now();
+		DeltaT = T1 - T0;
 
-			DeltaT = T1 - T0;
-			if (DeltaT > 0.0) m_cam->m_fps = 1.0 * nbFrameToCopy / DeltaT;
-		}
+		if (DeltaT > 0.0)
+            m_cam->m_fps = m_cam->m_image_number / DeltaT;
 
     } // end of acquisition loop
 
@@ -1864,7 +1864,7 @@ void Camera::CameraThread::execStartAcq()
 
 	if( failed(err) )
 	{
-        releaseWaitHandle( m_waitHandle           );        
+        releaseWaitHandle( m_wait_handle           );        
         dcambuf_release  ( m_cam->m_camera_handle ); // Release the capture frame
         setStatus        ( CameraThread::Fault    );
 
@@ -1874,7 +1874,7 @@ void Camera::CameraThread::execStartAcq()
 	}
 
     // release the wait handle
-    releaseWaitHandle( m_waitHandle );        
+    releaseWaitHandle( m_wait_handle );        
 
 	// Release the capture frame
 	err = dcambuf_release( m_cam->m_camera_handle );
@@ -1891,10 +1891,10 @@ void Camera::CameraThread::execStartAcq()
 		DEB_TRACE() << "dcambuf_release success.";
     }
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
 	DEB_TRACE() << "Total time (s): " << (Timestamp::now() - T0);
 	DEB_TRACE() << "FPS           : " << int(m_cam->m_image_number / (Timestamp::now() - T0) );
-	DEB_TRACE() << "Lost frames   : " << m_cam->m_lostFramesCount; 
+	DEB_TRACE() << "Lost frames   : " << m_cam->m_lost_frames_count; 
 
     setStatus(CameraThread::Ready);
 	DEB_TRACE() << "CameraThread::execStartAcq - END";
@@ -1903,13 +1903,13 @@ void Camera::CameraThread::execStartAcq()
 //-----------------------------------------------------------------------------
 // Copy the given frames to the buffer manager
 //-----------------------------------------------------------------------------
-bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] index of the frame where to begin copy
-							          const int        iFrameCount, ///< [in] number of frames to copy
+bool Camera::CameraThread::copyFrames(const int        index_frame_begin, ///< [in] index of the frame where to begin copy
+							          const int        nb_frames_count, ///< [in] number of frames to copy
 								      StdBufferCbMgr & buffer_mgr ) ///< [in] buffer manager object
 {
 	DEB_MEMBER_FUNCT();
 	
-	DEB_TRACE() << "copyFrames(" << iFrameBegin << ", nb:" << iFrameCount << ")";
+	DEB_TRACE() << "copyFrames(" << index_frame_begin << ", nb:" << nb_frames_count << ")";
 
     DCAMERR  err         ;
     FrameDim frame_dim   = buffer_mgr.getFrameDim();
@@ -1917,9 +1917,9 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
     int      height      = frame_size.getHeight  ();
     int      memSize     = frame_dim.getMemSize  ();
     bool     CopySuccess = false                   ;
-    int      iFrameIndex = iFrameBegin             ; // Index of frame in the DCAM cycling buffer
+    int      iFrameIndex = index_frame_begin             ; // Index of frame in the DCAM cycling buffer
 
-	for  (int cptFrame = 1 ; cptFrame <= iFrameCount ; cptFrame++)
+	for  (int cptFrame = 1 ; cptFrame <= nb_frames_count ; cptFrame++)
 	{
         void     * dst         = buffer_mgr.getFrameBufferPtr(m_cam->m_image_number);
 		void     * src         ;
@@ -1961,7 +1961,7 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
 			    bImageCopied = true;
 
                 DEB_TRACE() << "Aquired m_image_number > " << m_cam->m_image_number
-                            << " (frameIndex:"             << iFrameIndex           << ")" 
+                            << " (frame_index:"             << iFrameIndex           << ")" 
                             << " (rowbytes:"               << sRowbytes             << ")"
                             << " (height:"                 << height                << ")";
             }
@@ -1997,7 +1997,7 @@ bool Camera::CameraThread::copyFrames(const int        iFrameBegin, ///< [in] in
 			}
 		}
 
-		iFrameIndex = (iFrameIndex+1) % Camera::g_DCAMFrameBufferSize;
+		iFrameIndex = (iFrameIndex+1) % m_cam->m_frame_buffer_size;
 	}
 
 	DEB_TRACE() << DEB_VAR1(CopySuccess);
@@ -2037,19 +2037,19 @@ int Camera::getMaxNumberofViews(void)
 {
     DEB_MEMBER_FUNCT();
 
-    FeatureInfos FeatureObj;
+    FeatureInfos feature_obj;
     int32        nView     = 0;
 
-    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_NUMBEROF_VIEW", DCAM_IDPROP_NUMBEROF_VIEW, FeatureObj ) )
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_NUMBEROF_VIEW", DCAM_IDPROP_NUMBEROF_VIEW, feature_obj ) )
     {
         manage_trace( deb, "Failed to get number of view");
     }
     else
     {
-	    DEB_TRACE() << g_TraceLineSeparator.c_str();
-        FeatureObj.traceGeneralInformations();
+	    DEB_TRACE() << g_trace_line_separator.c_str();
+        feature_obj.traceGeneralInformations();
 
-        nView = static_cast<int32>(FeatureObj.m_max);
+        nView = static_cast<int32>(feature_obj.m_max);
     }
 
     DEB_TRACE() << DEB_VAR1(nView);
@@ -2060,22 +2060,22 @@ int Camera::getMaxNumberofViews(void)
 //-----------------------------------------------------------------------------
 /// Set the W-VIEW mode
 //-----------------------------------------------------------------------------
-void Camera::setViewMode(bool in_ViewModeActivated, ///< [in] view mode activation or not
-                         int  in_ViewsNumber      ) ///< [in] number of views if view mode activated
+void Camera::setViewMode(bool in_view_mode_activated, ///< [in] view mode activation or not
+                         int  in_views_number      ) ///< [in] number of views if view mode activated
 {
     DEB_MEMBER_FUNCT();
-    DEB_PARAM() << DEB_VAR2(in_ViewModeActivated, in_ViewsNumber);
+    DEB_PARAM() << DEB_VAR2(in_view_mode_activated, in_views_number);
 
     DCAMERR  err;
 
-    if(in_ViewModeActivated)
+    if(in_view_mode_activated)
     {
-        if(m_MaxViews > 1)
+        if(m_max_views > 1)
         {
             // checking if the W-View mode is possible for this camera
-	        if( m_MaxViews < in_ViewsNumber )
+	        if( m_max_views < in_views_number )
             {
-                manage_error( deb, "Unable to activate W-VIEW mode", DCAMERR_NONE, NULL, "max views number %d, needed %d", m_MaxViews, in_ViewsNumber);
+                manage_error( deb, "Unable to activate W-VIEW mode", DCAMERR_NONE, NULL, "max views number %d, needed %d", m_max_views, in_views_number);
                 THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
             }
 
@@ -2089,10 +2089,10 @@ void Camera::setViewMode(bool in_ViewModeActivated, ///< [in] view mode activati
                 THROW_HW_ERROR(Error) << "Unable to activate W-VIEW mode";
 		    }
 
-            m_ViewModeEnabled = true          ; // W-View mode with splitting image
-            m_ViewNumber      = in_ViewsNumber; // number of W-Views
+            m_view_mode_enabled = true          ; // W-View mode with splitting image
+            m_view_number      = in_views_number; // number of W-Views
 
-            manage_trace( deb, "W-VIEW mode activated", DCAMERR_NONE, NULL, "views number %d", in_ViewsNumber);
+            manage_trace( deb, "W-VIEW mode activated", DCAMERR_NONE, NULL, "views number %d", in_views_number);
         }
         else
         // W-View is not supported for this camera
@@ -2115,13 +2115,13 @@ void Camera::setViewMode(bool in_ViewModeActivated, ///< [in] view mode activati
 		}
 
         // if view mode was activated, we rewrite the exposure time
-        if (m_ViewModeEnabled)
+        if (m_view_mode_enabled)
         {
             setExpTime(m_exp_time); // rewrite the value in the camera
         }
 
-        m_ViewModeEnabled = false; // W-View mode with splitting image
-        m_ViewNumber      = 0    ; // number of W-Views
+        m_view_mode_enabled = false; // W-View mode with splitting image
+        m_view_number      = 0    ; // number of W-Views
 
         manage_trace( deb, "W-VIEW mode unactivated");
     }
@@ -2144,10 +2144,10 @@ void Camera::setViewMode(bool flag)
 void Camera::getViewMode(bool& flag)
 {
     DEB_MEMBER_FUNCT();
-    double  sensormode;
-    DCAMERR err       ;
+    double  sensor_mode;
+    DCAMERR err        ;
 
-    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &sensormode);
+    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &sensor_mode);
 
     if( failed(err) )
     {
@@ -2156,57 +2156,57 @@ void Camera::getViewMode(bool& flag)
         THROW_HW_ERROR(Error) << "Cannot get sensor mode";
     }
 
-    flag = (static_cast<int>(sensormode) == DCAMPROP_SENSORMODE__SPLITVIEW);
+    flag = (static_cast<int>(sensor_mode) == DCAMPROP_SENSORMODE__SPLITVIEW);
 }
 
 //-----------------------------------------------------------------------------
 /// Set the new exposure time for a view
 //-----------------------------------------------------------------------------
-void Camera::setViewExpTime(int    ViewIndex, ///< [in] view index [0...m_MaxViews[
-                            double exp_time ) ///< [in] exposure time to set
+void Camera::setViewExpTime(int    view_index, ///< [in] view index [0...m_max_views[
+                            double exp_time  ) ///< [in] exposure time to set
 {
     DEB_MEMBER_FUNCT();
-    DEB_PARAM() << DEB_VAR2(ViewIndex, exp_time);
+    DEB_PARAM() << DEB_VAR2(view_index, exp_time);
 
     DCAMERR err;
 
     // W-View is not supported for this camera
-    if(m_MaxViews < 2)
+    if(m_max_views < 2)
     {
         manage_error( deb, "Cannot set view exposure time - This camera does not support the W-View mode.", DCAMERR_NONE);
         THROW_HW_ERROR(Error) << "Cannot set view exposure time - This camera does not support the W-View mode.";
     }
     else
-    if(ViewIndex < m_MaxViews)
+    if(view_index < m_max_views)
     {
         // Changing a View exposure time is not allowed if W-VIEW mode is not activated but we keep the value
-        if(!m_ViewModeEnabled)
+        if(!m_view_mode_enabled)
         {
             manage_error( deb, "Cannot change W-View exposure time when W-VIEW mode is unactivated!", DCAMERR_NONE, "setViewExpTime");
         }
         else
         {
             // set the exposure time
-            err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_VIEW_((ViewIndex + 1), DCAM_IDPROP_EXPOSURETIME), exp_time);
+            err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_VIEW_((view_index + 1), DCAM_IDPROP_EXPOSURETIME), exp_time);
 
             if( failed(err) )
             {
                 manage_error( deb, "Cannot set view exposure time", err, 
-                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_EXPOSURETIME, VIEW INDEX=%d, VALUE=%lf", ViewIndex, exp_time);
+                              "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_EXPOSURETIME, VIEW INDEX=%d, VALUE=%lf", view_index, exp_time);
                 THROW_HW_ERROR(Error) << "Cannot set view exposure time";
             }
 
-            double tempexp_time;
-            getViewExpTime(ViewIndex, tempexp_time);
-            manage_trace( deb, "Changed View Exposure time", DCAMERR_NONE, NULL, "views index %d, exp:%lf >> real:%lf", ViewIndex, exp_time, tempexp_time);
+            double temp_exp_time;
+            getViewExpTime(view_index, temp_exp_time);
+            manage_trace( deb, "Changed View Exposure time", DCAMERR_NONE, NULL, "views index %d, exp:%lf >> real:%lf", view_index, exp_time, temp_exp_time);
         }
 
-        m_ViewExpTime[ViewIndex] = exp_time;
+        m_view_exp_time[view_index] = exp_time;
     }
     else
     {
         manage_error( deb, "Cannot set view exposure time", DCAMERR_NONE, 
-                      "", "VIEW INDEX=%d, MAX VIEWS=%d", ViewIndex, m_MaxViews);
+                      "", "VIEW INDEX=%d, MAX VIEWS=%d", view_index, m_max_views);
         THROW_HW_ERROR(Error) << "Cannot set view exposure time";
     }
 }
@@ -2214,37 +2214,37 @@ void Camera::setViewExpTime(int    ViewIndex, ///< [in] view index [0...m_MaxVie
 //-----------------------------------------------------------------------------
 /// Get the current exposure time for a view
 //-----------------------------------------------------------------------------
-void Camera::getViewExpTime(int      ViewIndex, ///< [in] view index [0...m_MaxViews[
-                            double & exp_time ) ///< [out] current exposure time
+void Camera::getViewExpTime(int      view_index, ///< [in] view index [0...m_max_views[
+                            double & exp_time  ) ///< [out] current exposure time
 {
     DEB_MEMBER_FUNCT();
-    DEB_PARAM() << DEB_VAR1(ViewIndex);
+    DEB_PARAM() << DEB_VAR1(view_index);
 
     DCAMERR err;
 
     // W-View is not supported for this camera
-    if(m_MaxViews < 2)
+    if(m_max_views < 2)
     {
         exp_time = m_exp_time;
     }
     else
-    if(ViewIndex < m_MaxViews)
+    if(view_index < m_max_views)
     {
         double exposure;
 
         // if W-VIEW mode is not activated we cannot retrieve the current value 
-        if(!m_ViewModeEnabled)
+        if(!m_view_mode_enabled)
         {
-            exposure = m_ViewExpTime[ViewIndex];
+            exposure = m_view_exp_time[view_index];
         }
         else
         {
-            err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_VIEW_((ViewIndex + 1), DCAM_IDPROP_EXPOSURETIME), &exposure);
+            err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_VIEW_((view_index + 1), DCAM_IDPROP_EXPOSURETIME), &exposure);
 
 	        if( failed(err) )
 	        {
                 manage_error( deb, "Cannot get view exposure time", err, 
-                              "dcamprop_getvalue", "IDPROP=DCAM_IDPROP_EXPOSURETIME, VIEW INDEX=%d", ViewIndex);
+                              "dcamprop_getvalue", "IDPROP=DCAM_IDPROP_EXPOSURETIME, VIEW INDEX=%d", view_index);
                 THROW_HW_ERROR(Error) << "Cannot get view exposure time";
 	        }
         }
@@ -2254,7 +2254,7 @@ void Camera::getViewExpTime(int      ViewIndex, ///< [in] view index [0...m_MaxV
     else
     {
         manage_error( deb, "Cannot get view exposure time", DCAMERR_NONE, 
-                      "", "VIEW INDEX=%d, MAX VIEWS=%d", ViewIndex, m_MaxViews);
+                      "", "VIEW INDEX=%d, MAX VIEWS=%d", view_index, m_max_views);
         THROW_HW_ERROR(Error) << "Cannot get view exposure time";
     }
 }
@@ -2267,20 +2267,20 @@ void Camera::getMinViewExpTime(double& exp_time) ///< [out] current exposure tim
     DEB_MEMBER_FUNCT();
 
     // the exposure is the minimum of the views'exposure values
-    int    ViewIndex   = 0   ;
-	double exposure    = -1.0; // we search the minimum value - this is the not set value
-    double Viewexposure; 
+    int    view_index   = 0   ;
+	double exposure     = -1.0; // we search the minimum value - this is the not set value
+    double view_exposure; 
 
-    if(m_MaxViews > 1)
+    if(m_max_views > 1)
     {
-        while(ViewIndex < m_MaxViews)
+        while(view_index < m_max_views)
         {
-            getViewExpTime(ViewIndex, Viewexposure);
+            getViewExpTime(view_index, view_exposure);
             
-            if((exposure == -1.0) || (Viewexposure < exposure))
-                exposure = Viewexposure; // sets the new minimum
+            if((exposure == -1.0) || (view_exposure < exposure))
+                exposure = view_exposure; // sets the new minimum
 
-            ViewIndex++;
+            view_index++;
         }
     }
 
@@ -2322,27 +2322,27 @@ void Camera::getViewExpTime2(double & exp_time ) ///< [out] current exposure tim
 //-----------------------------------------------------------------------------
 /// Set the blank mode of the Sync-readout trigger
 //-----------------------------------------------------------------------------
-void Camera::setSyncReadoutBlankMode(enum SyncReadOut_BlankMode in_SyncReadOutMode) ///< [in] type of sync-readout trigger's blank
+void Camera::setSyncReadoutBlankMode(enum SyncReadOut_BlankMode in_sync_read_out_mode) ///< [in] type of sync-readout trigger's blank
 {
     DEB_MEMBER_FUNCT();
-    DEB_PARAM() << DEB_VAR1(in_SyncReadOutMode);
+    DEB_PARAM() << DEB_VAR1(in_sync_read_out_mode);
 
     DCAMERR  err ;
     int      mode;
 
-    if(in_SyncReadOutMode == SyncReadOut_BlankMode_Standard)
+    if(in_sync_read_out_mode == SyncReadOut_BlankMode_Standard)
     {
         mode = DCAMPROP_SYNCREADOUT_SYSTEMBLANK__STANDARD;
     }
     else
-    if(in_SyncReadOutMode == SyncReadOut_BlankMode_Minimum)
+    if(in_sync_read_out_mode == SyncReadOut_BlankMode_Minimum)
     {
         mode = DCAMPROP_SYNCREADOUT_SYSTEMBLANK__MINIMUM;
     }
     else
 	{
         manage_error( deb, "Unable to set the SyncReadout blank mode", DCAMERR_NONE, 
-                           "", "in_SyncReadOutMode is unknown %d", static_cast<int>(in_SyncReadOutMode));
+                           "", "in_sync_read_out_mode is unknown %d", static_cast<int>(in_sync_read_out_mode));
         THROW_HW_ERROR(Error) << "Unable to set the SyncReadout blank mode";
 	}
 
@@ -2373,31 +2373,31 @@ void Camera::checkingROIproperties(void)
     DEB_MEMBER_FUNCT();
 
 	// Checking ROI properties
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHPOS" , DCAM_IDPROP_SUBARRAYHPOS , NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVPOS" , DCAM_IDPROP_SUBARRAYVPOS , NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE", DCAM_IDPROP_SUBARRAYHSIZE, NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE", DCAM_IDPROP_SUBARRAYVSIZE, NULL );
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHPOS VIEW1" , DCAM_IDPROP_VIEW_(1, DCAM_IDPROP_SUBARRAYHPOS ), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVPOS VIEW1" , DCAM_IDPROP_VIEW_(1, DCAM_IDPROP_SUBARRAYVPOS ), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE VIEW1", DCAM_IDPROP_VIEW_(1, DCAM_IDPROP_SUBARRAYHSIZE), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE VIEW1", DCAM_IDPROP_VIEW_(1, DCAM_IDPROP_SUBARRAYVSIZE), NULL );
 
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHPOS VIEW2" , DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYHPOS ), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVPOS VIEW2" , DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYVPOS ), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYHSIZE VIEW2", DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYHSIZE), NULL );
-	DEB_TRACE() << g_TraceLineSeparator.c_str();
+	DEB_TRACE() << g_trace_line_separator.c_str();
     traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE VIEW2", DCAM_IDPROP_VIEW_(2, DCAM_IDPROP_SUBARRAYVSIZE), NULL );
 }
 
@@ -2409,7 +2409,7 @@ bool Camera::isSensorTemperatureSupported(void)
     DEB_MEMBER_FUNCT();
 
     DCAMERR err;
-    bool    Supported;
+    bool    supported;
     double  temperature = 0.0;
     
 	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORTEMPERATURE, &temperature );
@@ -2418,7 +2418,7 @@ bool Camera::isSensorTemperatureSupported(void)
 	{
         if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
         {
-            Supported = false;
+            supported = false;
         }
         else
         {
@@ -2428,10 +2428,10 @@ bool Camera::isSensorTemperatureSupported(void)
     }    
     else
     {
-        Supported = true;
+        supported = true;
     }
 
-    return Supported;
+    return supported;
 }
 
 //-----------------------------------------------------------------------------
@@ -2726,7 +2726,7 @@ bool Camera::isHighDynamicRangeSupported(void)
     DEB_MEMBER_FUNCT();
 
     DCAMERR err;
-    bool    Supported;
+    bool    supported;
     double  temp;
     
 	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, &temp );
@@ -2735,7 +2735,7 @@ bool Camera::isHighDynamicRangeSupported(void)
 	{
         if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
         {
-            Supported = false;
+            supported = false;
         }
         else
         {
@@ -2745,10 +2745,10 @@ bool Camera::isHighDynamicRangeSupported(void)
     }    
     else
     {
-        Supported = true;
+        supported = true;
     }
 
-    return Supported;
+    return supported;
 }
 
 //-----------------------------------------------------------------------------

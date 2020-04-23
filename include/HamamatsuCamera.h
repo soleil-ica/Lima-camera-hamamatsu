@@ -125,7 +125,7 @@ namespace lima
 
 	//-----------------------------------------------------------------------------
 	public:
-	    Camera(const std::string& config_path,int camera_number=0);
+	    Camera(const std::string& config_path,int camera_number=0, int frame_buffer_size=10);
 	    ~Camera();
 
 	    void startAcq();
@@ -183,21 +183,21 @@ namespace lima
 	    void initialiseController();
 	    void setFastExtTrigger(bool flag);
 	    void getFastExtTrigger(bool& flag);
-		void getReadoutSpeed(short int& readoutSpeed);		///< [out] current readout speed
-		void setReadoutSpeed(const short int readoutSpeed); ///< [in]  new readout speed
-		void getLostFrames(unsigned long int& lostFrames);	///< [out] current lost frames
+		void getReadoutSpeed(short int& readout_speed);		///< [out] current readout speed
+		void setReadoutSpeed(const short int readout_speed); ///< [in]  new readout speed
+		void getLostFrames(unsigned long int& lost_frames);	///< [out] current lost frames
 		void getFPS(double& fps);							///< [out] last computed fps
    
-        void setSyncReadoutBlankMode(enum SyncReadOut_BlankMode in_SyncReadOutMode); ///< [in] type of sync-readout trigger's blank
+        void setSyncReadoutBlankMode(enum SyncReadOut_BlankMode in_sync_read_out_mode); ///< [in] type of sync-readout trigger's blank
 
         int  getNumberofViews   (void);
         int  getMaxNumberofViews(void);
 
-        void setViewExpTime(int    ViewIndex,     ///< [in] view index [0...m_MaxViews[
-                            double exp_time );    ///< [in] exposure time to set
+        void setViewExpTime(int    view_index,     ///< [in] view index [0...m_max_views[
+                            double exp_time  );    ///< [in] exposure time to set
 
-        void getViewExpTime(int      ViewIndex,   ///< [in] view index [0...m_MaxViews[
-                            double & exp_time );  ///< [out] current exposure time
+        void getViewExpTime(int      view_index,   ///< [in] view index [0...m_max_views[
+                            double & exp_time  );  ///< [out] current exposure time
 
         void getMinViewExpTime(double& exp_time); ///< [out] current exposure time
 
@@ -208,8 +208,8 @@ namespace lima
 
         void setViewMode(bool   flag);
         void getViewMode(bool & flag);
-        void setViewMode(bool in_ViewModeActivated,  ///< [in] view mode activation or not
-                         int  in_ViewsNumber      ); ///< [in] number of views if view mode activated
+        void setViewMode(bool in_view_mode_activated,  ///< [in] view mode activation or not
+                         int  in_views_number       ); ///< [in] number of views if view mode activated
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
@@ -278,20 +278,20 @@ namespace lima
 		private:
 			void execStartAcq();
 
-            bool copyFrames(const int iFrameBegin,			///< [in] index of the frame where to begin copy
-							const int iFrameCount,			///< [in] number of frames to copy
+            bool copyFrames(const int index_frame_begin,	///< [in] index of the frame where to begin copy
+							const int nb_frames_count  ,	///< [in] number of frames to copy
 							StdBufferCbMgr& buffer_mgr );	///< [in] buffer manager object
 
             void checkStatusBeforeCapturing() const;
 
-            void createWaitHandle (HDCAMWAIT & waitHandle) const;
-            void releaseWaitHandle(HDCAMWAIT & waitHandle) const;
+            void createWaitHandle (HDCAMWAIT & wait_handle) const;
+            void releaseWaitHandle(HDCAMWAIT & wait_handle) const;
 
-            void getTransfertInfo(int32 & frameIndex,
-                                  int32 & frameCount);
+            void getTransfertInfo(int32 & frame_index,
+                                  int32 & frame_count);
 
-			Camera*   m_cam       ;
-            HDCAMWAIT m_waitHandle;
+			Camera*   m_cam        ;
+            HDCAMWAIT m_wait_handle;
 
 		};
 		friend class CameraThread;
@@ -308,7 +308,7 @@ namespace lima
         public:
             FeatureInfos();
 
-            bool checkifValueExists(const double ValueToCheck) const; ///< [in] contains the value we need to check the existance
+            bool checkifValueExists(const double value_to_check) const; ///< [in] contains the value we need to check the existance
 
             void traceModePossibleValues (void) const;
             void traceGeneralInformations(void) const;
@@ -316,22 +316,22 @@ namespace lima
             void RoundValue(int & inout_value)  const;
 
 		private:
-            string         m_name           ; ///< name of the feature	
-            double         m_min            ; ///< min value of the feature	
-            double         m_max            ; ///< max value of the feature
-            double         m_step           ; ///< minimum stepping between a value and the next
-            double         m_defaultvalue   ; ///< default value of the feature
-            vector<double> m_vectValues     ; ///< contains possible values of the property
-            vector<string> m_vectModeLabels ; ///< contains possible text values of the mode
-            vector<double> m_vectModeValues ; ///< contains possible values of the mode
-            bool           m_hasRange       ; ///< range supported ?
-            bool           m_hasStep        ; ///< step supported ?
-            bool           m_hasDefault     ; ///< default value supported ?
-            bool           m_isWritable     ; ///< is writable ?
-            bool           m_isReadable     ; ///< is readable ?
-            bool           m_hasView        ; ///< has view ?
-            bool           m_hasAutoRounding; ///< has auto rounding ?
-            int32 		   m_MaxView        ; ///< max view if supported
+            string         m_name             ; ///< name of the feature	
+            double         m_min              ; ///< min value of the feature	
+            double         m_max              ; ///< max value of the feature
+            double         m_step             ; ///< minimum stepping between a value and the next
+            double         m_default_value    ; ///< default value of the feature
+            vector<double> m_vect_values      ; ///< contains possible values of the property
+            vector<string> m_vect_mode_labels ; ///< contains possible text values of the mode
+            vector<double> m_vect_mode_values ; ///< contains possible values of the mode
+            bool           m_has_range        ; ///< range supported ?
+            bool           m_has_step         ; ///< step supported ?
+            bool           m_has_default      ; ///< default value supported ?
+            bool           m_is_writable      ; ///< is writable ?
+            bool           m_is_readable      ; ///< is readable ?
+            bool           m_has_view         ; ///< has view ?
+            bool           m_has_auto_rounding; ///< has auto rounding ?
+            int32 		   m_max_view         ; ///< max view if supported
         };
 
 		//-----------------------------------------------------------------------------
@@ -341,105 +341,104 @@ namespace lima
         static std::string string_format_arg(const char* format, va_list args);
         static std::string string_format    (const char* format, ...);
 
-        string dcam_get_string( HDCAM hdcam ,        ///< [in] camera handle 
-                                int32 idStr ) const; ///< [in] string identifier
+        string dcam_get_string( HDCAM hd_cam ,        ///< [in] camera handle 
+                                int32 id_str ) const; ///< [in] string identifier
 
         void manage_trace( DebObj     & deb                     ,             ///< [in] trace object
-                           const char * optDesc   = NULL        ,             ///< [in] optional description (NULL if not used)
-                           int32        idStr     = DCAMERR_NONE,             ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                           const char * opt_desc  = NULL        ,             ///< [in] optional description (NULL if not used)
+                           int32        id_str    = DCAMERR_NONE,             ///< [in] error string identifier (DCAMERR_NONE if no hd_cam error to trace)
                            const char * fct       = NULL        ,             ///< [in] function name which returned the error (NULL if not used)
                            const char * opt       = NULL        , ...) const; ///< [in] optional string to concat to the error string (NULL if not used)
 
         static void static_manage_trace( const Camera     * const cam              ,       ///< [in] camera object
                                          DebObj           & deb                    ,       ///< [in] trace object
-                                         const char       * optDesc  = NULL        ,       ///< [in] optional description (NULL if not used)
-                                         int32              idStr    = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                         const char       * opt_desc = NULL        ,       ///< [in] optional description (NULL if not used)
+                                         int32              id_str   = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hd_cam error to trace)
                                          const char       * fct      = NULL        ,       ///< [in] function name which returned the error (NULL if not used)
                                          const char       * opt      = NULL        , ...); ///< [in] optional string to concat to the error string (NULL if not used)
 
         void manage_error( DebObj     & deb                     ,             ///< [in] trace object
-                           const char * optDesc   = NULL        ,             ///< [in] optional description (NULL if not used)
-                           int32        idStr     = DCAMERR_NONE,             ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                           const char * opt_desc  = NULL        ,             ///< [in] optional description (NULL if not used)
+                           int32        id_str    = DCAMERR_NONE,             ///< [in] error string identifier (DCAMERR_NONE if no hd_cam error to trace)
                            const char * fct       = NULL        ,             ///< [in] function name which returned the error (NULL if not used)
                            const char * opt       = NULL        , ...) const; ///< [in] optional string to concat to the error string (NULL if not used)
 
         static std::string static_manage_error( const Camera     * const cam              ,       ///< [in] camera object
                                                 DebObj           & deb                    ,       ///< [in] trace object
-                                                const char       * optDesc  = NULL        ,       ///< [in] optional description (NULL if not used)
-                                                int32              idStr    = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                                const char       * opt_desc = NULL        ,       ///< [in] optional description (NULL if not used)
+                                                int32              id_str   = DCAMERR_NONE,       ///< [in] error string identifier (DCAMERR_NONE if no hd_cam error to trace)
                                                 const char       * fct      = NULL        ,       ///< [in] function name which returned the error (NULL if not used)
                                                 const char       * opt      = NULL        , ...); ///< [in] optional string to concat to the error string (NULL if not used)
 
         static std::string static_trace_string_va_list( const Camera     * const cam,  ///< [in] camera object
                                                         DebObj           & deb      ,  ///< [in] trace object
-                                                        const char       * optDesc  ,  ///< [in] optional description (NULL if not used)
-                                                        int32              idStr    ,  ///< [in] error string identifier (DCAMERR_NONE if no hdcam error to trace)
+                                                        const char       * opt_desc ,  ///< [in] optional description (NULL if not used)
+                                                        int32              id_str   ,  ///< [in] error string identifier (DCAMERR_NONE if no hd_cam error to trace)
                                                         const char       * fct      ,  ///< [in] function name which returned the error (NULL if not used)
                                                         const char       * opt      ,  ///< [in] optional string to concat to the error string (NULL if not used)
                                                         va_list            args     ,  ///< [in] optional args (printf style) to merge with the opt string (NULL if not used)
-                                                        bool               isError  ); ///< [in] true if traced like an error, false for a classic info trace
+                                                        bool               is_error ); ///< [in] true if traced like an error, false for a classic info trace
 
 		//-----------------------------------------------------------------------------
         void   execStopAcq();
 
-        void   showCameraInfo      (HDCAM hdcam); ///< [in] camera device id
-        void   showCameraInfoDetail(HDCAM hdcam); ///< [in] camera device id
+        void   showCameraInfo      (HDCAM hd_cam); ///< [in] camera device id
+        void   showCameraInfoDetail(HDCAM hd_cam); ///< [in] camera device id
 
         HDCAM  dcam_init_open(long camera_number); ///< [in] id of the camera to open
 
-        bool   dcamex_setsubarrayrect( HDCAM hdcam    ,  ///< [in] camera handle
+        bool   dcamex_setsubarrayrect( HDCAM hd_cam    ,  ///< [in] camera handle
                                        long  left     ,  ///< [in] left  (x)
                                        long  top      ,  ///< [in] top   (y)
                                        long  width    ,  ///< [in] horizontal size
                                        long  height   ,  ///< [in] vertical size
-                                       int   ViewIndex); ///< [in] View index [0...max view[. Use g_GetSubArrayDoNotUseView for general subarray 
+                                       int   view_index); ///< [in] View index [0...max view[. Use g_get_sub_array_do_not_use_view for general subarray 
 
-		bool   dcamex_getsubarrayrect( HDCAM   hdcam    ,  ///< [in] camera handle
+		bool   dcamex_getsubarrayrect( HDCAM   hd_cam    ,  ///< [in] camera handle
 									   int32 & left     ,  ///< [in] left  (x)
 									   int32 & top      ,  ///< [in] top   (y)
 									   int32 & width    ,  ///< [in] horizontal size
 									   int32 & height   ,  ///< [in] vertical size
-                                       int     ViewIndex); ///< [in] View index [0...max view[. Use -1 for general subarray 
+                                       int     view_index); ///< [in] View index [0...max view[. Use -1 for general subarray 
 
-		long   dcamex_getimagewidth (const HDCAM hdcam ); ///< [in] camera handle
+		long   dcamex_getimagewidth (const HDCAM hd_cam ); ///< [in] camera handle
 		
-		long   dcamex_getimageheight(const HDCAM hdcam ); ///< [in] camera handle
+		long   dcamex_getimageheight(const HDCAM hd_cam ); ///< [in] camera handle
 
-		long   dcamex_getbitsperchannel( HDCAM hdcam );    ///< [in] camera handle
+		long   dcamex_getbitsperchannel( HDCAM hd_cam );    ///< [in] camera handle
 
-        void   dcamex_setimagepixeltype( HDCAM hdcam   ,  ///< [in] camera handle
-                                        int   pixeltype); ///< [in] pixel type
+        void   dcamex_setimagepixeltype( HDCAM hd_cam   ,  ///< [in] camera handle
+                                        int   pixel_type); ///< [in] pixel type
 
-        bool   dcamex_getfeatureinq( HDCAM          hdcam      ,        ///< [in ] camera handle
-                                     const string   featurename,        ///< [in ] feature name
-                                     long           idfeature  ,        ///< [in ] feature id
-                                     FeatureInfos & FeatureObj ) const; ///< [out] feature informations class	
+        bool   dcamex_getfeatureinq( HDCAM          hd_cam      ,        ///< [in ] camera handle
+                                     const string   feature_name,        ///< [in ] feature name
+                                     long           id_feature  ,        ///< [in ] feature id
+                                     FeatureInfos & feature_obj ) const; ///< [out] feature informations class	
 
-        bool dcamex_getpropertyvalues( HDCAM         hdcam        ,        ///< [in ] camera handle
-                                       DCAMPROP_ATTR attr         ,        ///< [in ] attribut which contains the array base
-                                       vector<double> & vectValues) const; ///< [out] contains possible values of the property
+        bool dcamex_getpropertyvalues( HDCAM            hd_cam     ,        ///< [in ] camera handle
+                                       DCAMPROP_ATTR    attr       ,        ///< [in ] attribut which contains the array base
+                                       vector<double> & vect_values) const; ///< [out] contains possible values of the property
 
-        bool dcamex_getmodevalues( HDCAM            hdcam     ,        ///< [in ] camera handle
-                                   DCAMPROP_ATTR    attr      ,        ///< [in ] attribut which contains the array base
-                                   vector<string> & vectLabel ,        ///< [out] contains possible text values of the mode
-                                   vector<double> & vectValues) const; ///< [out] contains possible values of the mode
+        bool dcamex_getmodevalues( HDCAM            hd_cam     ,        ///< [in ] camera handle
+                                   DCAMPROP_ATTR    attr       ,        ///< [in ] attribut which contains the array base
+                                   vector<string> & vect_label ,        ///< [out] contains possible text values of the mode
+                                   vector<double> & vect_values) const; ///< [out] contains possible values of the mode
 
         bool getTriggerMode(const TrigMode trig_mode) const; ///< [in]  lima trigger mode value
 
-        void traceFeatureGeneralInformations( HDCAM          hdcam      ,        ///< [in ] camera handle
-                                              const string   featurename,        ///< [in ] feature name
-                                              long           idfeature  ,        ///< [in ] feature id
-                                              FeatureInfos * OptFeature ) const; ///< [out] optional feature object to receive data
+        void traceFeatureGeneralInformations( HDCAM          hd_cam      ,        ///< [in ] camera handle
+                                              const string   feature_name,        ///< [in ] feature name
+                                              long           id_feature  ,        ///< [in ] feature id
+                                              FeatureInfos * opt_feature ) const; ///< [out] optional feature object to receive data
 
         void TraceTriggerData() const;
 
-        void setTriggerPolarity(enum Trigger_Polarity in_TriggerPolarity) const; ///< [in] type of trigger polarity
+        void setTriggerPolarity(enum Trigger_Polarity in_trigger_polarity) const; ///< [in] type of trigger polarity
 
 		// DCAM-SDK Helper end
-
-		bool  isBinningSupported(const int   binValue); /// Check if a binning value is supported
-        int32 GetBinningMode    (const int   binValue); ///< [in] binning value to chck for
-        int   GetBinningFromMode(const int32 binMode );	///< [in] binning mode to chck for
+		bool  isBinningSupported(const int   bin_value); /// Check if a binning value is supported
+        int32 GetBinningMode    (const int   bin_value); ///< [in] binning value to chck for
+        int   GetBinningFromMode(const int32 bin_mode );	///< [in] binning mode to chck for
 
 		vector<int> m_vectBinnings; /// list of available binning modes
 		
@@ -459,16 +458,15 @@ namespace lima
 		map<int, string>			m_map_triggerMode;
 
 		// Specific
-		unsigned int long			m_lostFramesCount;
-		double						m_fps            ;
-		int							m_fpsUpdatePeriod;
+		unsigned int long			m_lost_frames_count;
+		double						m_fps              ;
       
 	    //- camera stuff 
 	    string                      m_detector_model;
 	    string                      m_detector_type ;
 		long						m_depth         ;
-        long                        m_bytesPerPixel ;
-		long						m_maxImageWidth, m_maxImageHeight;
+        long                        m_bytes_per_pixel;
+		long						m_max_image_width, m_max_image_height;
     
 	    //- Hamamatsu SDK stuff
 	    string                      m_config_path        ;
@@ -477,8 +475,9 @@ namespace lima
 	    DWORD				        m_camera_capabilities;
 	    string                      m_camera_error_str   ;
 	    int                         m_camera_error       ;
+        int                         m_frame_buffer_size  ; // number of images in the DCAM internal buffer 
     	   
-	    bool                        m_fasttrigger        ;
+	    bool                        m_fasttrigger        ; // ?
 	    int                         m_temperature_sp     ;   
 	    int                         m_read_mode          ;
 	    int                         m_acq_mode           ;  
@@ -486,31 +485,30 @@ namespace lima
 	    double                      m_exp_time_max       ;
 
 		CameraThread 				m_thread             ;
-		Mutex						m_mutexForceStop     ;
+		Mutex						m_mutex_force_stop   ;
 
 	    trigOptionsMap              m_map_trig_modes     ;
 
-        FeatureInfos                m_FeaturePosx        ; // property data to check the ROI
-        FeatureInfos                m_FeaturePosy        ; // property data to check the ROI
-        FeatureInfos                m_FeatureSizex       ; // property data to check the ROI
-        FeatureInfos                m_FeatureSizey       ; // property data to check the ROI
+        FeatureInfos                m_feature_pos_x      ; // property data to check the ROI
+        FeatureInfos                m_feature_pos_y      ; // property data to check the ROI
+        FeatureInfos                m_feature_size_x     ; // property data to check the ROI
+        FeatureInfos                m_feature_size_y     ; // property data to check the ROI
 
         //- W-View management
-        bool                        m_ViewModeEnabled    ; // W-View mode with splitting image
-        int                         m_ViewNumber         ; // number of W-Views
-        int                         m_MaxViews           ; // maximum number of views for this camera (if > 1 then W-View mode is supported) 
-	    double                    * m_ViewExpTime        ; // array of exposure value by view
+        bool                        m_view_mode_enabled  ; // W-View mode with splitting image
+        int                         m_view_number        ; // number of W-Views
+        int                         m_max_views          ; // maximum number of views for this camera (if > 1 then W-View mode is supported) 
+	    double                    * m_view_exp_time      ; // array of exposure value by view
 
 		//-----------------------------------------------------------------------------
         // Constants
 		//-----------------------------------------------------------------------------
-        static const double g_OrcaPixelSize           ;
-        static const int    g_DCAMFrameBufferSize     ;
-        static const int    g_DCAMStrMsgSize          ;
-        static const int    g_GetSubArrayDoNotUseView ;
+        static const double g_orca_pixel_size              ;
+        static const int    g_dcam_str_msg_size            ;
+        static const int    g_get_sub_array_do_not_use_view;
 
-        static const string g_TraceLineSeparator      ;
-        static const string g_TraceLittleLineSeparator;
+        static const string g_trace_line_separator       ;
+        static const string g_trace_little_line_separator;
 	};
     } // namespace Hamamatsu
 } // namespace lima
