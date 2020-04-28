@@ -265,6 +265,9 @@ namespace lima
 
 			CameraThread(Camera * cam);
 
+            // destructor
+            virtual ~CameraThread();
+
 			virtual void start();
             virtual void abort();
 
@@ -499,6 +502,8 @@ namespace lima
         int                         m_view_number        ; // number of W-Views
         int                         m_max_views          ; // maximum number of views for this camera (if > 1 then W-View mode is supported) 
 	    double                    * m_view_exp_time      ; // array of exposure value by view
+
+        bool                        m_hdr_enabled        ; // high dynamic range activation latest value
 
 		//-----------------------------------------------------------------------------
         // Constants

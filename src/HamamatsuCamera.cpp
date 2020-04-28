@@ -32,6 +32,9 @@ using namespace lima::Hamamatsu;
 using namespace std;
 
 //-----------------------------------------------------------------------------
+//#define HAMAMATSU_CAMERA_DEBUG_ACQUISITION
+
+//-----------------------------------------------------------------------------
 const double Camera::g_orca_pixel_size            = 6.5e-6;
 const int    Camera::g_dcam_str_msg_size           = 256   ;
 const int    Camera::g_get_sub_array_do_not_use_view  = -1    ;
@@ -85,6 +88,7 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
 	  m_read_mode      (2)    ,
 	  m_lost_frames_count(0)  ,
 	  m_fps            (0.0)  ,
+      m_hdr_enabled    (false),
 	  m_view_exp_time  (NULL)   // array of exposure value by view
 
 #pragma warning( pop ) 
@@ -1317,42 +1321,10 @@ void Camera::startAcq()
     DEB_MEMBER_FUNCT();
 	DEB_TRACE() << g_trace_line_separator.c_str();
 
-    DCAMERR err              = DCAMERR_NONE;
-    int32   number_of_buffer = m_frame_buffer_size;
-	long    status;
-
     traceAllRoi();
-
-	// Allocate frames to capture
-	err = dcambuf_alloc( m_camera_handle, number_of_buffer );
-
-	if( failed(err) )
-	{
-        manage_error( deb, "Failed to allocate frames for the capture", err, 
-                      "dcambuf_alloc", "number_of_buffer=%d",number_of_buffer);
-        THROW_HW_ERROR(Error) << "Cannot allocate frame for capturing (dcam_allocframe()).";
-	}
-    else
-    {
-		DEB_TRACE() << "Allocated frames: " << number_of_buffer;
-    }
 
     m_image_number = 0;
 	m_fps          = 0;
-
-    // --- check first the acquisition is idle
-	err = dcamcap_status( m_camera_handle, &status );
-	if( failed(err) )
-	{
-        manage_error( deb, "Cannot get camera status", err, "dcamcap_status");
-        THROW_HW_ERROR(Error) << "Cannot get camera status";
-	}
-
-	if (DCAMCAP_STATUS_READY != status)
-	{
-		DEB_ERROR() << "Cannot start acquisition, camera is not ready";
-        THROW_HW_ERROR(Error) << "Cannot start acquisition, camera is not ready";
-	}
 
 	// init force stop flag before starting acq thread
 	m_thread.m_force_stop = false;
@@ -1398,6 +1370,16 @@ Camera::CameraThread::CameraThread(Camera * cam)
 	DEB_TRACE() << "DONE";
 }
 
+/************************************************************************
+ * \brief destructor
+ ************************************************************************/
+Camera::CameraThread::~CameraThread()
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "CameraThread::~CameraThread";
+    abort();
+}
+
 //---------------------------------------------------------------------------------------
 //! Camera::CameraThread::start()
 //---------------------------------------------------------------------------------------
@@ -1417,7 +1399,7 @@ void Camera::CameraThread::init()
 {
 	DEB_MEMBER_FUNCT();
     setStatus(CameraThread::Ready);
-	DEB_TRACE() << "DONE";
+	DEB_TRACE() << "CameraThread::init DONE";
 }
 
 //---------------------------------------------------------------------------------------
@@ -1427,7 +1409,7 @@ void Camera::CameraThread::abort()
 {
 	DEB_MEMBER_FUNCT();
     CmdThread::abort();
-	DEB_TRACE() << "DONE";
+	DEB_TRACE() << "CameraThread::abort DONE";
 }
 
 //---------------------------------------------------------------------------------------
@@ -1619,10 +1601,41 @@ void Camera::CameraThread::execStartAcq()
     Timestamp T0    ;
     Timestamp T1    ;
     Timestamp DeltaT;
+	long      status;
 
 	DEB_TRACE() << m_cam->g_trace_line_separator.c_str();
 	DEB_TRACE() << "CameraThread::execStartAcq - BEGIN";
     setStatus(CameraThread::Exposure);
+
+	// Allocate frames to capture
+	err = dcambuf_alloc( m_cam->m_camera_handle, m_cam->m_frame_buffer_size );
+
+	if( failed(err) )
+	{
+        std::string errorText = static_manage_error( m_cam, deb, "Failed to allocate frames for the capture", err, 
+                                                     "dcambuf_alloc", "number_of_buffer=%d",m_cam->m_frame_buffer_size);
+        REPORT_EVENT(errorText);
+        THROW_HW_ERROR(Error) << "Cannot allocate frame for capturing (dcam_allocframe()).";
+	}
+    else
+    {
+		DEB_ALWAYS() << "Allocated frames: " << m_cam->m_frame_buffer_size;
+    }
+
+    // --- check first the acquisition is idle
+	err = dcamcap_status( m_cam->m_camera_handle, &status );
+	if( failed(err) )
+	{
+        std::string errorText = static_manage_error( m_cam, deb, "Cannot get camera status", err, "dcamcap_status");
+        REPORT_EVENT(errorText);
+        THROW_HW_ERROR(Error) << "Cannot get camera status!";
+	}
+
+	if (DCAMCAP_STATUS_READY != status)
+	{
+        DEB_ERROR() << "Cannot start acquisition, camera is not ready";
+        THROW_HW_ERROR(Error) << "Cannot start acquisition, camera is not ready";
+	}
 
 	StdBufferCbMgr& buffer_mgr = m_cam->m_buffer_ctrl_obj.getBuffer();
 	buffer_mgr.setStartTimestamp(Timestamp::now());
@@ -1787,11 +1800,11 @@ void Camera::CameraThread::execStartAcq()
         {
 			deltaFrames = frame_count-lastFrameCount;
         	DEB_TRACE() << g_trace_little_line_separator.c_str();
-			DEB_TRACE() << "m_image_number > "  << m_cam->m_image_number 
-			            << " lastFrameIndex > " << lastFrameIndex
-			            << " frame_index     > " << frame_index
-			            << " frame_count     > " << frame_count 
-                        << " (delta: " << deltaFrames << ")";
+            DEB_TRACE() << "(m_image_number:"  << m_cam->m_image_number << ")"
+                        << " (lastFrameIndex:" << lastFrameIndex        << ")" 
+                        << " (frame_index:"    << frame_index           << ")" 
+                        << " (frame_count:"    << frame_count           << ")"
+                        << " (deltaFrames:"    << deltaFrames           << ")";
 
 			if (0 == frame_count)
 			{
@@ -1891,10 +1904,11 @@ void Camera::CameraThread::execStartAcq()
 		DEB_TRACE() << "dcambuf_release success.";
     }
 
-	DEB_TRACE() << g_trace_line_separator.c_str();
-	DEB_TRACE() << "Total time (s): " << (Timestamp::now() - T0);
-	DEB_TRACE() << "FPS           : " << int(m_cam->m_image_number / (Timestamp::now() - T0) );
-	DEB_TRACE() << "Lost frames   : " << m_cam->m_lost_frames_count; 
+	DEB_ALWAYS() << g_trace_line_separator.c_str();
+	DEB_ALWAYS() << "Total time (s): " << (T1 - T0);
+	DEB_ALWAYS() << "FPS           : " << int(m_cam->m_image_number / (T1 - T0) );
+	DEB_ALWAYS() << "Lost frames   : " << m_cam->m_lost_frames_count; 
+	DEB_ALWAYS() << g_trace_line_separator.c_str();
 
     setStatus(CameraThread::Ready);
 	DEB_TRACE() << "CameraThread::execStartAcq - END";
@@ -1960,10 +1974,12 @@ bool Camera::CameraThread::copyFrames(const int        index_frame_begin, ///< [
                 memcpy( dst, src, sRowbytes * height );
 			    bImageCopied = true;
 
-                DEB_TRACE() << "Aquired m_image_number > " << m_cam->m_image_number
-                            << " (frame_index:"             << iFrameIndex           << ")" 
+            #ifdef HAMAMATSU_CAMERA_DEBUG_ACQUISITION
+                DEB_TRACE() << "Acquired (m_image_number:" << m_cam->m_image_number << ")"
+                            << " (frame_index:"            << iFrameIndex           << ")" 
                             << " (rowbytes:"               << sRowbytes             << ")"
                             << " (height:"                 << height                << ")";
+            #endif
             }
         }
 
@@ -2144,19 +2160,28 @@ void Camera::setViewMode(bool flag)
 void Camera::getViewMode(bool& flag)
 {
     DEB_MEMBER_FUNCT();
-    double  sensor_mode;
-    DCAMERR err        ;
 
-    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &sensor_mode);
-
-    if( failed(err) )
+    if(getStatus() == CameraThread::Ready)
     {
-        manage_error( deb, "Cannot get sensor mode", err, 
-                      "dcamprop_getvalue", "IDPROP=DCAM_IDPROP_SENSORMODE");
-        THROW_HW_ERROR(Error) << "Cannot get sensor mode";
-    }
+        double  sensor_mode;
+        DCAMERR err        ;
 
-    flag = (static_cast<int>(sensor_mode) == DCAMPROP_SENSORMODE__SPLITVIEW);
+        err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &sensor_mode);
+
+        if( failed(err) )
+        {
+            manage_error( deb, "Cannot get sensor mode", err, 
+                          "dcamprop_getvalue", "IDPROP=DCAM_IDPROP_SENSORMODE");
+            THROW_HW_ERROR(Error) << "Cannot get sensor mode";
+        }
+
+        flag = (static_cast<int>(sensor_mode) == DCAMPROP_SENSORMODE__SPLITVIEW);
+    }
+    else
+    // do not call the sdk functions during acquisition
+    {
+        flag = m_view_mode_enabled;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -2238,6 +2263,7 @@ void Camera::getViewExpTime(int      view_index, ///< [in] view index [0...m_max
             exposure = m_view_exp_time[view_index];
         }
         else
+        if(getStatus() == CameraThread::Ready)
         {
             err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_VIEW_((view_index + 1), DCAM_IDPROP_EXPOSURETIME), &exposure);
 
@@ -2247,6 +2273,11 @@ void Camera::getViewExpTime(int      view_index, ///< [in] view index [0...m_max
                               "dcamprop_getvalue", "IDPROP=DCAM_IDPROP_EXPOSURETIME, VIEW INDEX=%d", view_index);
                 THROW_HW_ERROR(Error) << "Cannot get view exposure time";
 	        }
+        }
+        else
+        // do not call the sdk functions during acquisition
+        {
+            exposure = m_view_exp_time[view_index];
         }
 
 	    exp_time = exposure;
@@ -2762,28 +2793,38 @@ bool Camera::getHighDynamicRangeEnabled(void)
     double  temp;
     bool    high_dynamic_range_mode = false;
     
-	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, &temp );
-    
-    if( failed(err) )
-	{
-        manage_trace( deb, "Unable to retrieve the high dynamic range mode", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
-
-        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
-        {
-            THROW_HW_ERROR(Error) << "Unable to retrieve the high dynamic range mode";
-        }
-    }    
-    else
+    if(getStatus() == CameraThread::Ready)
     {
-        int high_dynamic_range = static_cast<int>(temp);
+	    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_HIGHDYNAMICRANGE_MODE, &temp );
+        
+        if( failed(err) )
+	    {
+            manage_trace( deb, "Unable to retrieve the high dynamic range mode", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
 
-        DEB_TRACE() << DEB_VAR1(high_dynamic_range);
-
-        if(high_dynamic_range == DCAMPROP_MODE__OFF) high_dynamic_range_mode = false; else
-        if(high_dynamic_range == DCAMPROP_MODE__ON ) high_dynamic_range_mode = true ; else
+            if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
+            {
+                THROW_HW_ERROR(Error) << "Unable to retrieve the high dynamic range mode";
+            }
+        }    
+        else
         {
-            manage_trace( deb, "The read high dynamic range mode is incoherent!", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
+            int high_dynamic_range = static_cast<int>(temp);
+
+            DEB_TRACE() << DEB_VAR1(high_dynamic_range);
+
+            if(high_dynamic_range == DCAMPROP_MODE__OFF) high_dynamic_range_mode = false;
+            else
+            if(high_dynamic_range == DCAMPROP_MODE__ON ) high_dynamic_range_mode = true ;
+            else
+            {
+                manage_trace( deb, "The read high dynamic range mode is incoherent!", err, "dcamprop_getvalue - DCAM_IDPROP_HIGHDYNAMICRANGE_MODE");
+            }
         }
+    }
+    else
+    // do not call the sdk functions during acquisition
+    {
+        high_dynamic_range_mode = m_hdr_enabled;
     }
     
     return high_dynamic_range_mode;
@@ -2814,6 +2855,9 @@ void Camera::setHighDynamicRangeEnabled(const bool & in_enabled)
 
     // forcing the image pixel type to 16 bits
     dcamex_setimagepixeltype( m_camera_handle, DCAM_PIXELTYPE_MONO16);
+
+    // keep the latest value
+    m_hdr_enabled = in_enabled;
 }
 
 //=============================================================================

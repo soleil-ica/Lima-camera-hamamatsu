@@ -733,7 +733,7 @@ bool Camera::dcamex_getfeatureinq( HDCAM          hd_cam      ,       ///< [in ]
 
 	if( failed(err) )
 	{
-        manage_error( deb, "Error in dcamex_getfeatureinq", err,  "dcamprop_getattr()", "IDPROP=0x%08x", id_feature);
+        manage_error( deb, "Error in dcamex_getfeatureinq", err,  "dcamprop_getattr()", "NAME=%s IDPROP=0x%08x", feature_name.c_str(), id_feature);
 		return false;
 	}
 
