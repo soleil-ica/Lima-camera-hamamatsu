@@ -183,8 +183,6 @@ namespace lima
 	    void initialiseController();
 	    void setFastExtTrigger(bool flag);
 	    void getFastExtTrigger(bool& flag);
-		void getReadoutSpeed(short int& readout_speed);		///< [out] current readout speed
-		void setReadoutSpeed(const short int readout_speed); ///< [in]  new readout speed
 		void getLostFrames(unsigned long int& lost_frames);	///< [out] current lost frames
 		void getFPS(double& fps);							///< [out] last computed fps
    
@@ -222,11 +220,15 @@ namespace lima
         bool        getHighDynamicRangeEnabled(void);
         void        setHighDynamicRangeEnabled(const bool & in_enabled);
 
+        std::string getReadoutSpeedLabel(void);
+        void        setReadoutSpeedLabel(const std::string & in_readout_speed_label);
+
         bool isSensorTemperatureSupported(void);
         bool isTemperatureStatusSupported(void);
         bool isCoolerModeSupported       (void);
         bool isCoolerStatusSupported     (void);
         bool isHighDynamicRangeSupported (void);
+        bool isReadoutSpeedSupported     (void);
 
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
@@ -237,6 +239,12 @@ namespace lima
 
         enum Camera::Cooler_Status getCoolerStatus(void);
         std::string getCoolerStatusLabelFromStatus(enum Camera::Cooler_Status in_cooler_status);
+
+        short int getReadoutSpeed(void) const;
+		void      setReadoutSpeed(const short int readout_speed); ///< [in]  new readout speed
+
+        std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
+        short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
 
 	//-----------------------------------------------------------------------------
 	private:
