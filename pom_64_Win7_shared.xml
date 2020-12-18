@@ -10,68 +10,31 @@
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
     <artifactId>LimaHamamatsu-${aol}-shared-${mode}</artifactId>
-    <version>2.3.0</version>
+    <version>2.4.0</version>
 
     <packaging>nar</packaging>
     <name>LimaHamamatsu</name>
     <description>This module controls the Hamamatsu Detector</description>
+
+    <properties>
+		<sdkhamamatsu-lib>${project.basedir}\dcamsdk4\lib\win64\</sdkhamamatsu-lib>
+		<sdkhamamatsu-include>${project.basedir}\dcamsdk4\inc\</sdkhamamatsu-include>
+	</properties>
     
     <scm>
         <connection>scm:git:git://github.com/soleil-ica/Lima-camera-hamamatsu.git</connection>
         <developerConnection>scm:git:git://github.com/soleil-ica/Lima-camera-hamamatsu.git</developerConnection>
         <url>https://github.com/soleil-ica/Lima-camera-hamamatsu</url>
     </scm>
-
-	<properties>
-        <libs-64bits>C:\VC_12_MAVEN\LIB_VC12_64</libs-64bits>
-
-		<yat-lib>${libs-64bits}\yat\target\nar\lib\amd64-Windows-msvc\shared\</yat-lib>
-		<yat-include>${libs-64bits}\yat\target\nar\include\</yat-include>
-
-		<hdf5-lib>${libs-64bits}\hdf5\lib\x64\</hdf5-lib>
-		<hdf5-include>${libs-64bits}\hdf5\include\</hdf5-include>
-		
-		<nexuscpp-lib>${libs-64bits}\nexuscpp\target\nar\lib\amd64-Windows-msvc\shared</nexuscpp-lib>
-		<nexuscpp-include>${libs-64bits}\nexuscpp\target\nar\include\</nexuscpp-include>
-		
-		<sdkhamamatsu-lib>${project.basedir}\dcamsdk4\lib\win64\</sdkhamamatsu-lib>
-		<sdkhamamatsu-include>${project.basedir}\dcamsdk4\inc\</sdkhamamatsu-include>
-	</properties>
-	
+    
     <dependencies>
         <dependency>
             <groupId>fr.soleil.lib</groupId>
             <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
             <version>1.7.9</version>
         </dependency>
-        
-        <!-- <dependency>
-            <groupId>com.hamamatsu</groupId>
-            <artifactId>dcamapi-${aol}-shared-${mode}</artifactId>
-            <version>13.10</version>
-        </dependency>       
-        
-        <dependency>
-            <groupId>fr.soleil.lib</groupId>
-            <artifactId>NexusCPP-${aol}-static-${mode}</artifactId>
-            <version>3.1.5-vc9</version>
-        </dependency>
-				
-        <dependency>
-            <groupId>fr.soleil.lib</groupId>
-            <artifactId>YAT-${aol}-static-${mode}</artifactId>
-            <version>1.13.4-vc9</version>
-        </dependency>
-            
-        <dependency>
-            <groupId>ncsa.uiuc.edu</groupId>
-            <artifactId>HDF5-${aol}-shared-release</artifactId>
-            <version>1.8.13-vc9</version>
-        </dependency>    
-		-->  
-  
     </dependencies>
-
+	
     <build>
         <plugins>
             <plugin>
@@ -98,9 +61,6 @@
                             <define>_WIN32_WINNT=_WIN32_WINNT_WIN7</define>
                             <define>WIN32_LEAN_AND_MEAN</define>					
                         </defines>
-<!--                        <systemIncludePaths>
-                            <systemIncludePath>temp-new-sdk/include</systemIncludePath>
-                        </systemIncludePaths>-->
 					</cpp>
 					<linker>
 						<libs>
@@ -108,45 +68,6 @@
 								<name>dcamapi</name>
 								<type>shared</type>
 								<directory>${sdkhamamatsu-lib}</directory>
-							</lib>
-						
-							<!-- nexuscpp 64 bits -->
-							<lib>
-								<name>NexusCPP-amd64-Windows-msvc12-shared-release-3.3.2</name>
-								<type>shared</type>
-								<directory>${nexuscpp-lib}</directory>
-							</lib>
-
-							<!-- yat 64 bits -->
-							<lib>
-								<name>YAT-amd64-Windows-msvc12-shared-release-1.14.4</name>
-								<type>shared</type>
-								<directory>${yat-lib}</directory>
-							</lib>
-							
-							<!-- hdf5 64 bits -->
-							<lib>
-								<name>hdf5</name>
-								<type>shared</type>
-								<directory>${hdf5-lib}</directory>
-							</lib>
-
-							<lib>
-								<name>hdf5_hl</name>
-								<type>shared</type>
-								<directory>${hdf5-lib}</directory>
-							</lib>
-
-							<lib>
-								<name>hdf5_cpp</name>
-								<type>shared</type>
-								<directory>${hdf5-lib}</directory>
-							</lib>
-							
-							<lib>
-								<name>hdf5_hl_cpp</name>
-								<type>shared</type>
-								<directory>${hdf5-lib}</directory>
 							</lib>
                         </libs>
 					</linker>
@@ -159,7 +80,7 @@
             </plugin>
         </plugins>
     </build>
-
+    
     <developers>
         <developer>
             <id>bouladoux</id>
