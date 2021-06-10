@@ -131,7 +131,7 @@ namespace lima
             Output_Trigger_Kind_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_KIND__EXPOSURE		
             Output_Trigger_Kind_Programmable        , // DCAMPROP_OUTPUTTRIGGER_KIND__PROGRAMABLE	
             Output_Trigger_Kind_TriggerReady        , // DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY	
-            Output_Trigger_Kind_High                , // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			
+            Output_Trigger_Kind_High                , // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			//Not yet available with current SDK
 
         };
 
@@ -258,6 +258,10 @@ namespace lima
         bool isHighDynamicRangeSupported (void);
         bool isReadoutSpeedSupported     (void);
 
+        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
+
+        enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
+
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
         std::string getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode);
@@ -274,10 +278,9 @@ namespace lima
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
 
-        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
+        
         std::string getOutputTriggerKindLabelFromKind(enum Camera::Output_Trigger_Kind out_trig_kind);
         
-        enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
         std::string getOutputTriggerPolarityLabelFromPolarity(enum Camera::Output_Trigger_Polarity out_trig_polarity);
 
         void getPropertyData(int32 property, int32 & array_base, int32 & step_element);
