@@ -63,7 +63,30 @@ We only provide here extra information for a better understanding of the capabil
  - IntTrig
  - ExtTrigSingle
  - ExtGate (not yet implemented)
+ 
+ 
+Output trigger
+................
 
+This plugin provide here capabilites to chnage output informations
+
+* Kind
+
+ Supported trigger Kind are : 
+ 
+ - Low
+ - Exposure
+ - Programmable
+ - Trigger Ready
+ - High
+ 
+
+* Polarity
+ 
+ Supported trigger Polarity are : 
+ 
+ - Negative
+ - Positive
 
 Optional capabilities
 ........................
