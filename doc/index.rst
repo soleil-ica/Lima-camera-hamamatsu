@@ -63,9 +63,6 @@ We only provide here extra information for a better understanding of the capabil
  - IntTrig
  - ExtTrigSingle
  - ExtGate (not yet implemented)
- 
- 
-
 
 
 Optional capabilities

@@ -234,8 +234,6 @@ namespace lima
                                       enum Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
         void setOutputTriggerPolarity(int in_channel,                                                ///< [in] the channel to set
                                       enum Camera::Output_Trigger_Polarity in_output_trig_polarity); ///< [in] polarity of the channel to set
-        std::string getOutputTriggerKindLabel    (int channel); ///< [in] channel to get
-        std::string getOutputTriggerPolarityLabel(int channel); ///< [in] channel to get
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
@@ -278,13 +276,7 @@ namespace lima
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
 
-        
-        std::string getOutputTriggerKindLabelFromKind(enum Camera::Output_Trigger_Kind out_trig_kind);
-        
-        std::string getOutputTriggerPolarityLabelFromPolarity(enum Camera::Output_Trigger_Polarity out_trig_polarity);
-
         void getPropertyData(int32 property, int32 & array_base, int32 & step_element);
-        int getNumberOfOutputTriggers();
 
 	//-----------------------------------------------------------------------------
 	private:
@@ -534,7 +526,6 @@ namespace lima
 	    int                         m_acq_mode           ;  
 	    double                      m_exp_time           ;
 	    double                      m_exp_time_max       ;
-        int                         m_nb_output_trig     ; //Number of available output trigger on sensor
 
 		CameraThread 				m_thread             ;
 		Mutex						m_mutex_force_stop   ;

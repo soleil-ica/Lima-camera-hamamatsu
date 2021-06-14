@@ -74,18 +74,6 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define READOUTSPEED_SLOW_NAME      "SLOW"
 #define READOUTSPEED_NORMAL_NAME    "NORMAL"
 
-#define OUTPUT_TRIGGER_NOT_SUPPORTED  "NOT_SUPPORTED"
-#define OUTPUT_TRIGGER_LOW            "LOW"
-#define OUTPUT_TRIGGER_GLOBALEXPOSURE "GLOBAL EXPOSURE"
-#define OUTPUT_TRIGGER_PROGRAMMABLE   "PROGRAMMABLE"
-#define OUTPUT_TRIGGER_TRIGGERREADY   "TRIGGER READY"
-#define OUTPUT_TRIGGER_HIGH           "HIGH"
-
-#define POLARITY_NOT_SUPPORTED  "NOT_SUPPORTED"
-#define POLARITY_NEGATIVE "NEGATIVE"
-#define POLARITY_POSITIVE "POSITIVE"
-
-
 //-----------------------------------------------------------------------------
 ///  Ctor
 //-----------------------------------------------------------------------------
@@ -106,8 +94,7 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
       m_lost_frames_count(0)  ,
       m_fps            (0.0)  ,
       m_hdr_enabled    (false),
-      m_view_exp_time  (NULL) ,  // array of exposure value by view
-      m_nb_output_trig (0)
+      m_view_exp_time  (NULL)   // array of exposure value by view
 
 #pragma warning( pop ) 
 {
@@ -1243,12 +1230,6 @@ void Camera::initialiseController()
         DEB_TRACE() << g_trace_line_separator.c_str();
         traceFeatureGeneralInformations(m_camera_handle, "DCAM_IDPROP_SUBARRAYVSIZE", DCAM_IDPROP_SUBARRAYVSIZE, &m_feature_size_y);
     }
-
-    //--------------------------------------------------------------------
-    // Checking Output Trigger Channel number
-    m_nb_output_trig = getNumberOfOutputTriggers();
-
-
 }
 
 //-----------------------------------------------------------------------------
@@ -2998,14 +2979,6 @@ HwEventCtrlObj* Camera::getEventCtrlObj()
     return &m_event_ctrl_obj;
 }
 
- int Camera::getNumberOfOutputTriggers()
-{
-    double tmp = 99;
-    dcamprop_getvalue(m_camera_handle, DCAM_IDPROP_NUMBEROF_OUTPUTTRIGGERCONNECTOR, &tmp);
-
-    return static_cast<int>(tmp);
-}
-
 //=============================================================================
 // OUTPUT TRIGGER KIND
 //=============================================================================
@@ -3069,30 +3042,6 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
     }
     
     return kind;
-}
-
-//-----------------------------------------------------------------------------
-// Get a output trigger kind label.
-//-----------------------------------------------------------------------------
-std::string Camera::getOutputTriggerKindLabelFromKind(enum Camera::Output_Trigger_Kind out_trig_kind)
-{
-    DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getOutputTriggerKindLabelFromKind(enum Camera::Output_Trigger_Kind out_trig_kind) : ...";
-    std::string label = "";
-
-    switch (out_trig_kind)
-    {
-        case Camera::Output_Trigger_Kind_Low             : label = OUTPUT_TRIGGER_LOW           ; break;
-        case Camera::Output_Trigger_Kind_Global_Exposure : label = OUTPUT_TRIGGER_GLOBALEXPOSURE; break;
-        case Camera::Output_Trigger_Kind_Programmable    : label = OUTPUT_TRIGGER_PROGRAMMABLE  ; break;
-        case Camera::Output_Trigger_Kind_TriggerReady    : label = OUTPUT_TRIGGER_TRIGGERREADY  ; break;
-        case Camera::Output_Trigger_Kind_High            : label = OUTPUT_TRIGGER_HIGH          ; break;
-        case Camera::Output_Trigger_Kind_Not_Supported   : label = OUTPUT_TRIGGER_NOT_SUPPORTED ; break;
-        default: break;
-	
-    }
-
-    return label;
 }
 
 //=============================================================================
@@ -3159,27 +3108,6 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
     }
     
     return polarity;
-}
-
-
-//-----------------------------------------------------------------------------
-// Get a output trigger polarity label.
-//-----------------------------------------------------------------------------
-std::string Camera::getOutputTriggerPolarityLabelFromPolarity(enum Camera::Output_Trigger_Polarity out_trig_polarity)
-{
-    DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getOutputTriggerPolarityLabelFromPolarity(enum Camera::Output_Trigger_Polarity out_trig_polarity): ...";
-    std::string label = "";
-
-    switch (out_trig_polarity)
-    {
-        case Camera::Output_Trigger_Polarity_Positive    : label = POLARITY_POSITIVE  ; break;
-        case Camera::Output_Trigger_Polarity_Negative    : label = POLARITY_NEGATIVE  ; break;
-        default: break;
-	
-    }
-
-    return label;
 }
 
 void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_element){
@@ -3334,20 +3262,5 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
             THROW_HW_ERROR(Error) << "Unable to set the Output trigger Polarity";
         }
     }
-
-}
-
-std::string Camera::getOutputTriggerKindLabel(int channel)
-{
-    DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getOutputTriggerKindLabel(int channel) : ...";
-    return getOutputTriggerKindLabelFromKind(getOutputTriggerKind(channel));
-}
-
-std::string Camera::getOutputTriggerPolarityLabel(int channel)
-{    
-    DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getOutputTriggerPolarityLabel(int channel) : ..." ;
-    return getOutputTriggerPolarityLabelFromPolarity(getOutputTriggerPolarity(channel));
 
 }
