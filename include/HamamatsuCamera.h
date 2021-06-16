@@ -231,7 +231,7 @@ namespace lima
 
         //-- Output Triggers  control
         void setOutputTriggerKind    (int channel,                                                   ///< [in] channel to set
-                                      enum Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
+                                      enum Camera::Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
         void setOutputTriggerPolarity(int in_channel,                                                ///< [in] the channel to set
                                       enum Camera::Output_Trigger_Polarity in_output_trig_polarity); ///< [in] polarity of the channel to set
 
@@ -276,6 +276,13 @@ namespace lima
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
 
+        /**
+        *\fn  getPropertyData
+        *\brief Get camera properties structure
+        *\param[in] property Property to get from camera
+        *\param[out] array_base Base id of property attribute
+        *\param[out] step_element Step for next element 
+        **/
         void getPropertyData(int32 property, int32 & array_base, int32 & step_element);
 
 	//-----------------------------------------------------------------------------
