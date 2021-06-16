@@ -2990,7 +2990,6 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
     DEB_MEMBER_FUNCT();
 
     DEB_TRACE() << " Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel) : ..."; 
-    enum Output_Trigger_Kind result = Output_Trigger_Kind::Output_Trigger_Kind_Not_Supported;
 
     DCAMERR err;
     double kindArraySize = 0;
@@ -3052,10 +3051,9 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
 //-----------------------------------------------------------------------------
 enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channel)
 {
-    
     DEB_MEMBER_FUNCT();
 
-    DEB_TRACE() << "Camera::getOutputTriggerPolarity(int channel) : channel = " << channel ;
+    DEB_TRACE() << "Camera::getOutputTriggerPolarity(int channel) : channel = " << channel;
 
     enum Output_Trigger_Polarity result = Output_Trigger_Polarity::Output_Trigger_Polarity_Not_Supported;
 
@@ -3063,67 +3061,70 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
     double polarityArraySize = 0;
     enum Output_Trigger_Polarity polarity = Camera::Output_Trigger_Polarity_Not_Supported;
 
-	// get property attribute that contains the Polarity (that may be an array)
-	DCAMPROP_ATTR	basepropattr;
-	memset(&basepropattr, 0, sizeof(basepropattr));
-	basepropattr.cbSize = sizeof(basepropattr);
-	basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_POLARITY;
-	err = dcamprop_getattr(m_camera_handle, &basepropattr);
+    // get property attribute that contains the Polarity (that may be an array)
+    DCAMPROP_ATTR basepropattr;
+    memset(&basepropattr, 0, sizeof(basepropattr));
+    basepropattr.cbSize = sizeof(basepropattr);
+    basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_POLARITY;
+    err = dcamprop_getattr(m_camera_handle, &basepropattr);
 
-     DEB_TRACE() << " Camera::getOutputTriggerPolarity(int channel) : get property attribute done";
+    DEB_TRACE() << " Camera::getOutputTriggerPolarity(int channel) : get property attribute done";
 
-    if( failed(err) )
+    if (failed(err))
     {
-        manage_trace( deb, "Unable to retrieve the output trigger kind attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_KIND");
+        manage_trace(deb, "Unable to retrieve the output trigger kind attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_KIND");
 
-        if((err != DCAMERR_INVALIDPROPERTYID)&&(err != DCAMERR_NOTSUPPORT))
+        if ((err != DCAMERR_INVALIDPROPERTYID) && (err != DCAMERR_NOTSUPPORT))
         {
             THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger kind attribute";
         }
-    }    
+    }
     else
     {
         //Get the ARRAYELEMENT size to ensure that the given channel is reachable
         err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &polarityArraySize);
-	    if (!failed(err) && channel < polarityArraySize)
-	    {
+        if (!failed(err) && channel < polarityArraySize)
+        {
             //Get the channel polarity value
             double tmp = 99;
-			err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
+            err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
 
-            if(!failed(err)){
-                
-                
+            if (!failed(err))
+            {
+
                 int32 value = static_cast<int32>(tmp);
 
-                switch(value) 
+                switch (value)
                 {
-                    case DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE     : polarity = Camera::Output_Trigger_Polarity_Negative ; break;
-                    case DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE     : polarity = Camera::Output_Trigger_Polarity_Positive ; break;
-                    default: break; // result will be Output_Trigger_Polarity_Not_Supported
-
+                case DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE:
+                    polarity = Camera::Output_Trigger_Polarity_Negative;
+                    break;
+                case DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE:
+                    polarity = Camera::Output_Trigger_Polarity_Positive;
+                    break;
+                default:
+                    break; // result will be Output_Trigger_Polarity_Not_Supported
                 }
             }
         }
     }
-    
+
     return polarity;
 }
 
-void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_element){
-    
-    DCAMERR  err ;
-	// get property attribute
-	DCAMPROP_ATTR	basepropattr;
-	memset(&basepropattr, 0, sizeof(basepropattr));
-	basepropattr.cbSize = sizeof(basepropattr);
-	basepropattr.iProp = property;
-	err = dcamprop_getattr(m_camera_handle, &basepropattr);
+void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_element)
+{
+    DCAMERR err;
+    // get property attribute
+    DCAMPROP_ATTR basepropattr;
+    memset(&basepropattr, 0, sizeof(basepropattr));
+    basepropattr.cbSize = sizeof(basepropattr);
+    basepropattr.iProp = property;
+    err = dcamprop_getattr(m_camera_handle, &basepropattr);
     if (!failed(err))
-	{
+    {
         array_base = basepropattr.iProp_ArrayBase;
         step_element = basepropattr.iPropStep_Element;
-
     }
 }
 		
@@ -3186,6 +3187,7 @@ void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_outpu
         {
             manage_trace( deb, "Unable to set the Output trigger Kind", err, 
                                "dcamprop_setvalue", "DCAM_IDPROP_OUTPUTTRIGGER_KIND[%d] %d", channel, kind);
+            THROW_HW_ERROR(Error) << "Unable to set the Output trigger Kind";
         }
 
         else
@@ -3206,24 +3208,13 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
     DCAMERR err;
     int     polarity;
 
-    // switch(in_output_trig_polarity)
-    // {
-    //     case Output_Trigger_Polarity_Negative : polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE; break;
-    //     case Output_Trigger_Polarity_Positive : polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE; break;
-
-    //     default : 
-    //     manage_error( deb, "Unable to set the Output trigger Polarity", DCAMERR_NONE, 
-    //                        "", "in_output_trig_polarity is unknown %d", static_cast<int>(in_output_trig_polarity));
-    //     THROW_HW_ERROR(Error) << "Unable to set the Output trigger Polarity";
-    //     break;
-    // }
-
     if (Output_Trigger_Polarity_Negative == in_output_trig_polarity)
     {
         polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE;
     }
 
-    else if(Output_Trigger_Polarity_Positive == in_output_trig_polarity)
+    else 
+    if(Output_Trigger_Polarity_Positive == in_output_trig_polarity)
     {
         polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE;
     }
@@ -3253,6 +3244,7 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
         {
             manage_trace( deb, "Unable to set the Output trigger Polarity", err, 
                                "dcamprop_setvalue", "DCAM_IDPROP_OUTPUTTRIGGER_POLARITY[%d] %d", in_channel, polarity);
+            THROW_HW_ERROR(Error) << "Unable to set the Output trigger Polarity";
         }
 
         else
