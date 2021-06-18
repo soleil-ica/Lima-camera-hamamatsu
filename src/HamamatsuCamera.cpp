@@ -73,6 +73,8 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define READOUTSPEED_NORMAL_VALUE   2
 #define READOUTSPEED_SLOW_NAME      "SLOW"
 #define READOUTSPEED_NORMAL_NAME    "NORMAL"
+#define NEGATIVE_POLARITY 0
+#define POSITIVE_POLARITY 1
 
 //-----------------------------------------------------------------------------
 ///  Ctor
@@ -3189,7 +3191,6 @@ void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_outpu
                                "dcamprop_setvalue", "DCAM_IDPROP_OUTPUTTRIGGER_KIND[%d] %d", channel, kind);
             THROW_HW_ERROR(Error) << "Unable to set the Output trigger Kind";
         }
-
         else
         {
             manage_error( deb, "Unable to set the SyncReadout blank mode", err, 
@@ -3208,13 +3209,13 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
     DCAMERR err;
     int     polarity;
 
-    if (Output_Trigger_Polarity_Negative == in_output_trig_polarity)
+    if (NEGATIVE_POLARITY == in_output_trig_polarity)
     {
         polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE;
     }
 
     else 
-    if(Output_Trigger_Polarity_Positive == in_output_trig_polarity)
+    if(POSITIVE_POLARITY == in_output_trig_polarity)
     {
         polarity = DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE;
     }
