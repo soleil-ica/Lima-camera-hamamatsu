@@ -97,6 +97,26 @@ Optional capabilities
 
  - Two readout modes are available: SLOW (30fps at full frame) or NORMAL (100fps at full frame).
 
+* Output trigger Kind
+
+ This plugin provides the ability to manage output triggers KIND.
+ Supported trigger Kind : 
+ 
+ - Low
+ - Exposure
+ - Programmable (without SOURCE, DELAY and PERIODE)
+ - Trigger Ready
+ - High (May not be available with current SDK)
+ 
+
+* Output trigger Polarity
+
+ This plugin provides the ability to manage output triggers POLARITY.
+ Supported trigger Polarity : 
+ 
+ - Negative
+ - Positive
+
 Configuration
 `````````````
 

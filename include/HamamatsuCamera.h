@@ -123,6 +123,26 @@ namespace lima
             Cooler_Status_Warning      , // DCAMPROP_SENSORCOOLERSTATUS__WARNING
         };
 
+        // relative to DCAM_IDPROP_OUTPUTTRIGGER_KIND
+        enum Output_Trigger_Kind
+        {
+            Output_Trigger_Kind_Not_Supported       ,
+            Output_Trigger_Kind_Low                 , // DCAMPROP_OUTPUTTRIGGER_KIND__LOW			
+            Output_Trigger_Kind_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_KIND__EXPOSURE		
+            Output_Trigger_Kind_Programmable        , // DCAMPROP_OUTPUTTRIGGER_KIND__PROGRAMABLE	
+            Output_Trigger_Kind_TriggerReady        , // DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY	
+            Output_Trigger_Kind_High                , // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			//Not yet available with current SDK
+
+        };
+
+        // relative to DCAM_IDPROP_OUTPUTTRIGGER_POLARITY
+        enum Output_Trigger_Polarity
+        {
+            Output_Trigger_Polarity_Not_Supported, 
+            Output_Trigger_Polarity_Negative, // DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE
+            Output_Trigger_Polarity_Positive, // DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE
+        };
+
 	//-----------------------------------------------------------------------------
 	public:
 	    Camera(const std::string& config_path,int camera_number=0, int frame_buffer_size=10);
@@ -209,6 +229,12 @@ namespace lima
         void setViewMode(bool in_view_mode_activated,  ///< [in] view mode activation or not
                          int  in_views_number       ); ///< [in] number of views if view mode activated
 
+        //-- Output Triggers  control
+        void setOutputTriggerKind    (int channel,                                                   ///< [in] channel to set
+                                      enum Camera::Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
+        void setOutputTriggerPolarity(int in_channel,                                                ///< [in] the channel to set
+                                      enum Camera::Output_Trigger_Polarity in_output_trig_polarity); ///< [in] polarity of the channel to set
+
         void traceAllRoi(void);
         void checkingROIproperties(void);
         
@@ -230,6 +256,10 @@ namespace lima
         bool isHighDynamicRangeSupported (void);
         bool isReadoutSpeedSupported     (void);
 
+        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
+
+        enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
+
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
         std::string getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode);
@@ -245,6 +275,15 @@ namespace lima
 
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
+
+        /**
+        *\fn  getPropertyData
+        *\brief Get camera properties structure
+        *\param[in] property Property to get from camera
+        *\param[out] array_base Base id of property attribute
+        *\param[out] step_element Step for next element 
+        **/
+        void getPropertyData(int32 property, int32 & array_base, int32 & step_element);
 
 	//-----------------------------------------------------------------------------
 	private:
