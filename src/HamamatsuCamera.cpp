@@ -3057,8 +3057,6 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
 
     DEB_TRACE() << "Camera::getOutputTriggerPolarity(int channel) : channel = " << channel;
 
-    enum Output_Trigger_Polarity result = Output_Trigger_Polarity::Output_Trigger_Polarity_Not_Supported;
-
     DCAMERR err;
     double polarityArraySize = 0;
     enum Output_Trigger_Polarity polarity = Camera::Output_Trigger_Polarity_Not_Supported;
