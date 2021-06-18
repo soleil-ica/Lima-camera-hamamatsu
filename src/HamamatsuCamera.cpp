@@ -2997,12 +2997,12 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
     double kindArraySize = 0;
     enum Output_Trigger_Kind kind = Camera::Output_Trigger_Kind_Not_Supported;
 
-	// get property attribute that contains the Kind (that may be an array)
-	DCAMPROP_ATTR	basepropattr;
-	memset(&basepropattr, 0, sizeof(basepropattr));
-	basepropattr.cbSize = sizeof(basepropattr);
-	basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_KIND;
-	err = dcamprop_getattr(m_camera_handle, &basepropattr);
+    // get property attribute that contains the Kind (that may be an array)
+    DCAMPROP_ATTR    basepropattr;
+    memset(&basepropattr, 0, sizeof(basepropattr));
+    basepropattr.cbSize = sizeof(basepropattr);
+    basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_KIND;
+    err = dcamprop_getattr(m_camera_handle, &basepropattr);
 
     if( failed(err) )
     {
@@ -3017,11 +3017,11 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
     {
         //Get the ARRAYELEMENT size to ensure that the given channel is reachable
         err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &kindArraySize);
-	    if (!failed(err) && channel < kindArraySize)
-	    {
+        if (!failed(err) && channel < kindArraySize)
+        {
             //Get the channel kind value
             double tmp = 99;
-			err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
+            err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
 
             if(!failed(err)){
                 
@@ -3127,7 +3127,7 @@ void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_el
         step_element = basepropattr.iPropStep_Element;
     }
 }
-		
+
 void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_output_trig_kind)
 {
     DEB_MEMBER_FUNCT();
