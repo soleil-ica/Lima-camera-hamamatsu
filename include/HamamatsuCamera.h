@@ -234,6 +234,8 @@ namespace lima
                                       enum Camera::Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
         void setOutputTriggerPolarity(int in_channel,                                                ///< [in] the channel to set
                                       enum Camera::Output_Trigger_Polarity in_output_trig_polarity); ///< [in] polarity of the channel to set
+        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
+        enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
@@ -255,10 +257,6 @@ namespace lima
         bool isCoolerStatusSupported     (void);
         bool isHighDynamicRangeSupported (void);
         bool isReadoutSpeedSupported     (void);
-
-        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
-
-        enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
 
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
