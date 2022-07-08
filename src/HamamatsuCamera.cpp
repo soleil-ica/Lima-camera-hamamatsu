@@ -1707,8 +1707,8 @@ void Camera::CameraThread::execStartAcq()
 
     DCAMERR   err          = DCAMERR_NONE;
     bool      continue_acq = true        ;
-    Timestamp T0    ;
-    Timestamp T1    ;
+    Timestamp T0    = Timestamp::now();
+    Timestamp T1    = Timestamp::now();
     Timestamp DeltaT;
     long      status;
 
@@ -1972,7 +1972,7 @@ void Camera::CameraThread::execStartAcq()
 
         m_cam->m_mutex_force_stop.unlock();
         
-        // Update fps
+        // Update fps 
         T1     = Timestamp::now();
         DeltaT = T1 - T0;
 

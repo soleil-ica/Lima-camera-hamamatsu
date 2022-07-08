@@ -57,8 +57,10 @@
                             <define>NDEBUG</define>
                             <define>_WINDOWS</define>
                             <define>_USRDLL</define>
-                            <define>_WIN32_WINNT=_WIN32_WINNT_WIN7</define>
-                            <define>WIN32_LEAN_AND_MEAN</define>					
+                            <!-- <define>_WIN32_WINNT=_WIN32_WINNT_WIN7</define> -->
+                            <!-- <define>WIN32_LEAN_AND_MEAN</define>					 -->
+							<define>LIMA_PROCESSCORE_DLL</define>
+							<define>LIMA_PROCESSCORE_BUILD</define>	
                         </defines>
 					</cpp>
 					<linker>
