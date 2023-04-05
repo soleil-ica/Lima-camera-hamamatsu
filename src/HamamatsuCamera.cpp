@@ -3266,3 +3266,108 @@ void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_el
         step_element = basepropattr.iPropStep_Element;
     }
 }
+
+std::string Camera::getAllParameters()
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::getAllParameters() : ...";
+
+    std::stringstream res;
+
+    int32 property_id; /* property ID */
+	
+	property_id = 0;
+	DCAMERR err;
+	err = dcamprop_getnextid(m_camera_handle, &property_id, DCAMPROP_OPTION_SUPPORT);
+	while(!failed(err) && property_id != 0)
+	{
+        /* The property_id value is a property ID that the device supports */
+        
+        /* Getting property value. */
+        double value;
+        char name[ 64 ];
+
+        err = dcamprop_getvalue(m_camera_handle, property_id, &value);
+        if(failed(err))
+        {
+            break;
+        }
+        
+        /* Getting property name. */
+        err = dcamprop_getname(m_camera_handle, property_id, name, sizeof(name));
+        if(failed(err))
+        {
+            break;
+        }
+        
+        res << "ID = " << property_id << "; " << name << " = " << value << std::endl;
+        
+        err = dcamprop_getnextid(m_camera_handle, &property_id, DCAMPROP_OPTION_SUPPORT);
+	}
+
+    return res.str();
+}
+
+std::string Camera::getParameter(int32 property_id)
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::getParameter(int32 property_id) : ...";
+
+    std::stringstream res;
+	DCAMERR err;
+
+    double value;
+    char name[ 64 ];
+
+    err = dcamprop_getvalue(m_camera_handle, property_id, &value);
+    if(failed(err))
+    {
+        manage_error( deb, "Unable to get the value of the property", err, 
+                               "dcamprop_getvalue");
+        THROW_HW_ERROR(Error) << "Unable to get the value of the property";
+    }
+    
+    /* Getting property name. */
+    err = dcamprop_getname(m_camera_handle, property_id, name, sizeof(name));
+    if(failed(err))
+    {
+        manage_error( deb, "Unable to get the name of the property", err, 
+                               "dcamprop_getname");
+        THROW_HW_ERROR(Error) << "Unable to get the name of the property";
+    }
+    res << name << " = " << value << std::endl;
+
+    return res.str();
+}
+
+void Camera::setParameter(int32 property_id, double value)
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::setParameter(int32 property_id, double value) : ...";
+
+	DCAMERR err;
+
+    err = dcamprop_setvalue(m_camera_handle, property_id, value);
+    if(failed(err))
+    {
+        if(err == DCAMERR_NOTSUPPORT)
+        {
+            manage_error( deb, "Property is not supported", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Property is not supported";
+        }
+        else if (err == DCAMERR_INVALIDPARAM)
+        {
+            manage_error( deb, "Invalid parameter", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Invalid parameter";
+        }
+        else
+        {
+            manage_error( deb, "Unable to set the property", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Unable to set the property";
+        }
+    }
+
+}
