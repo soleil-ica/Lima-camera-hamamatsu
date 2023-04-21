@@ -3251,14 +3251,14 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
 //-----------------------------------------------------------------------------
 /// Utility function
 //-----------------------------------------------------------------------------
-void Camera::getPropertyData(int32 parameter, int32 & array_base, int32 & step_element)
+void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_element)
 {
     DCAMERR err;
-    // get parameter attribute
+    // get property attribute
     DCAMPROP_ATTR basepropattr;
     memset(&basepropattr, 0, sizeof(basepropattr));
     basepropattr.cbSize = sizeof(basepropattr);
-    basepropattr.iProp = parameter;
+    basepropattr.iProp = property;
     err = dcamprop_getattr(m_camera_handle, &basepropattr);
     if (!failed(err))
     {
