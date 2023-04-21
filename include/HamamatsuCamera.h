@@ -258,6 +258,24 @@ namespace lima
         bool isHighDynamicRangeSupported (void);
         bool isReadoutSpeedSupported     (void);
 
+        /**
+        *\fn  getAllParameters
+        *\brief Get all camera parameters (Hamamatsu properties)
+        **/
+        std::string getAllParameters();
+
+        /**
+        *\fn  getParameter
+        *\brief Get camera parameter (Hamamatsu property)
+        **/
+        std::string getParameter(int32 iProp);
+
+        /**
+        *\fn  getParameters
+        *\brief Set camera parameter (Hamamatsu property)
+        **/
+        void setParameter(int32 iProp, double value);
+
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
         std::string getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode);
@@ -282,6 +300,8 @@ namespace lima
         *\param[out] step_element Step for next element 
         **/
         void getPropertyData(int32 property, int32 & array_base, int32 & step_element);
+
+        
 
 	//-----------------------------------------------------------------------------
 	private:

@@ -3266,3 +3266,94 @@ void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_el
         step_element = basepropattr.iPropStep_Element;
     }
 }
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+std::string Camera::getAllParameters()
+{
+
+    std::stringstream res;
+
+    int32 parameter_id; /* parameter ID */
+	
+	parameter_id = 0;
+	DCAMERR err;
+	
+	do
+	{
+        err = dcamprop_getnextid(m_camera_handle, &parameter_id, DCAMPROP_OPTION_SUPPORT);
+
+        std::string param = getParameter(parameter_id);
+        
+        res << "ID = " << parameter_id << "; " << param;
+        
+	} while(!failed(err) && parameter_id != 0);
+
+    return res.str();
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+std::string Camera::getParameter(int32 parameter_id)
+{
+    DEB_MEMBER_FUNCT();
+
+    std::stringstream res;
+	DCAMERR err;
+
+    double value;
+    char name[ 64 ];
+
+    err = dcamprop_getvalue(m_camera_handle, parameter_id, &value);
+    if(failed(err))
+    {
+        manage_error( deb, "Unable to get the value of the parameter", err, 
+                               "dcamprop_getvalue");
+        THROW_HW_ERROR(Error) << "Unable to get the value of the parameter";
+    }
+    
+    /* Getting parameter name. */
+    err = dcamprop_getname(m_camera_handle, parameter_id, name, sizeof(name));
+    if(failed(err))
+    {
+        manage_error( deb, "Unable to get the name of the parameter", err, 
+                               "dcamprop_getname");
+        THROW_HW_ERROR(Error) << "Unable to get the name of the parameter";
+    }
+    res << name << " = " << value << std::endl;
+
+    return res.str();
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void Camera::setParameter(int32 parameter_id, double value)
+{
+    DEB_MEMBER_FUNCT();
+
+	DCAMERR err;
+
+    err = dcamprop_setvalue(m_camera_handle, parameter_id, value);
+    if(failed(err))
+    {
+        if(err == DCAMERR_NOTSUPPORT)
+        {
+            manage_error( deb, "Parameter is not supported", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Parameter is not supported";
+        }
+        else if (err == DCAMERR_INVALIDPARAM)
+        {
+            manage_error( deb, "Invalid parameter", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Invalid parameter";
+        }
+        else
+        {
+            manage_error( deb, "Unable to set the parameter", err, 
+                                "dcamprop_setvalue");
+            THROW_HW_ERROR(Error) << "Unable to set the parameter";
+        }
+    }
+
+}
