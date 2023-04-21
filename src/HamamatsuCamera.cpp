@@ -3269,8 +3269,6 @@ void Camera::getPropertyData(int32 property, int32 & array_base, int32 & step_el
 
 std::string Camera::getAllParameters()
 {
-    DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getAllParameters() : ...";
 
     std::stringstream res;
 
@@ -3278,32 +3276,16 @@ std::string Camera::getAllParameters()
 	
 	property_id = 0;
 	DCAMERR err;
-	err = dcamprop_getnextid(m_camera_handle, &property_id, DCAMPROP_OPTION_SUPPORT);
-	while(!failed(err) && property_id != 0)
+	
+	do
 	{
-        /* The property_id value is a property ID that the device supports */
-        
-        /* Getting property value. */
-        double value;
-        char name[ 64 ];
-
-        err = dcamprop_getvalue(m_camera_handle, property_id, &value);
-        if(failed(err))
-        {
-            break;
-        }
-        
-        /* Getting property name. */
-        err = dcamprop_getname(m_camera_handle, property_id, name, sizeof(name));
-        if(failed(err))
-        {
-            break;
-        }
-        
-        res << "ID = " << property_id << "; " << name << " = " << value << std::endl;
-        
         err = dcamprop_getnextid(m_camera_handle, &property_id, DCAMPROP_OPTION_SUPPORT);
-	}
+
+        std::string param = getParameter(property_id);
+        
+        res << "ID = " << property_id << "; " << param;
+        
+	} while(!failed(err) && property_id != 0);
 
     return res.str();
 }
@@ -3311,7 +3293,6 @@ std::string Camera::getAllParameters()
 std::string Camera::getParameter(int32 property_id)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::getParameter(int32 property_id) : ...";
 
     std::stringstream res;
 	DCAMERR err;
@@ -3343,7 +3324,6 @@ std::string Camera::getParameter(int32 property_id)
 void Camera::setParameter(int32 property_id, double value)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::setParameter(int32 property_id, double value) : ...";
 
 	DCAMERR err;
 

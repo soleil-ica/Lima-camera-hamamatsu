@@ -260,19 +260,19 @@ namespace lima
 
         /**
         *\fn  getAllParameters
-        *\brief Get all camera properties
+        *\brief Get all camera parameters (Hamamatsu properties)
         **/
         std::string getAllParameters();
 
         /**
         *\fn  getParameter
-        *\brief Get camera property
+        *\brief Get camera parameter (Hamamatsu property)
         **/
         std::string getParameter(int32 iProp);
 
         /**
         *\fn  getParameters
-        *\brief Set camera property
+        *\brief Set camera parameter (Hamamatsu property)
         **/
         void setParameter(int32 iProp, double value);
 
