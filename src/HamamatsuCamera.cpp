@@ -170,6 +170,9 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
         
         m_nb_frames = 1;
 
+        // --- Initialize the map of the camera parameters
+        initParametersMap();
+
         // --- finally start the acq thread
         m_thread.start();
     }
@@ -3275,22 +3278,29 @@ std::string Camera::getAllParameters()
 
     std::stringstream res;
 
-    int32 parameter_id; /* parameter ID */
+    int32 parameter_id = 0; /* parameter ID */
+    int32 last_id = 0;
 	
-	parameter_id = 0;
+    char name[ 64 ];
 	DCAMERR err;
 	
 	do
 	{
         err = dcamprop_getnextid(m_camera_handle, &parameter_id, DCAMPROP_OPTION_SUPPORT);
+        if(failed(err) || last_id == parameter_id)
+        {
+            break;
+        }
+        last_id = parameter_id;
+        /* Getting parameter name. */
+        err = dcamprop_getname(m_camera_handle, parameter_id, name, sizeof(name));
         if(failed(err))
         {
-            manage_error( deb, "Unable to get the next parameter ID", err, "dcamprop_getnextid");
-            THROW_HW_ERROR(Error) << "Unable to get the next parameter ID";
+            break;
         }
-        std::string param = getParameter(parameter_id);
-        
-        res << "ID = " << parameter_id << "; " << param;
+        std::string param = getParameter(name); 
+
+        res << name << " = "<< param;
         
 	} while(!failed(err) && parameter_id != 0);
 
@@ -3299,7 +3309,7 @@ std::string Camera::getAllParameters()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-std::string Camera::getParameter(int32 parameter_id)
+std::string Camera::getParameter(std::string parameter_name)
 {
     DEB_MEMBER_FUNCT();
 
@@ -3307,35 +3317,28 @@ std::string Camera::getParameter(int32 parameter_id)
 	DCAMERR err;
 
     double value;
-    char name[ 64 ];
 
+    int parameter_id = m_map_parameters[parameter_name];
     err = dcamprop_getvalue(m_camera_handle, parameter_id, &value);
     if(failed(err))
     {
-        manage_error( deb, "Unable to get the value of the parameter", err, "dcamprop_getvalue");
+        manage_error( deb, "Unable to get the value of the parameter", err, 
+                               "dcamprop_getvalue");
         THROW_HW_ERROR(Error) << "Unable to get the value of the parameter";
     }
     
-    /* Getting parameter name. */
-    err = dcamprop_getname(m_camera_handle, parameter_id, name, sizeof(name));
-    if(failed(err))
-    {
-        manage_error( deb, "Unable to get the name of the parameter", err, "dcamprop_getname");
-        THROW_HW_ERROR(Error) << "Unable to get the name of the parameter";
-    }
-    res << name << " = " << value << std::endl;
-
+    res << value << std::endl;
     return res.str();
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void Camera::setParameter(int32 parameter_id, double value)
+void Camera::setParameter(std::string parameter_name, double value)
 {
     DEB_MEMBER_FUNCT();
 
 	DCAMERR err;
-
+    int parameter_id = m_map_parameters[parameter_name];
     err = dcamprop_setvalue(m_camera_handle, parameter_id, value);
     if(failed(err))
     {
@@ -3355,5 +3358,54 @@ void Camera::setParameter(int32 parameter_id, double value)
             THROW_HW_ERROR(Error) << "Unable to set the parameter";
         }
     }
+}
 
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void Camera::initParametersMap()
+{
+    DEB_MEMBER_FUNCT();
+
+    std::stringstream res;
+
+    int32 parameter_id; /* parameter ID */
+	
+	parameter_id = 0;
+	DCAMERR err;
+	
+	do
+	{
+        err = dcamprop_getnextid(m_camera_handle, &parameter_id, DCAMPROP_OPTION_SUPPORT);
+
+        if(failed(err))
+        {
+            break;
+        }
+
+        mapIdParameter(parameter_id);
+        
+	} while(!failed(err) && parameter_id != 0);
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void Camera::mapIdParameter(int32 parameter_id)
+{
+    DEB_MEMBER_FUNCT();
+
+    std::stringstream res;
+	DCAMERR err;
+
+    char name[ 64 ];
+ 
+    /* Getting parameter name. */
+    err = dcamprop_getname(m_camera_handle, parameter_id, name, sizeof(name));
+    if(failed(err))
+    {
+        manage_error( deb, "Unable to get the name of the parameter", err, 
+                               "dcamprop_getname");
+        THROW_HW_ERROR(Error) << "Unable to get the name of the parameter";
+    }
+    m_map_parameters.insert({name, parameter_id});
 }

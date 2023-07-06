@@ -268,13 +268,17 @@ namespace lima
         *\fn  getParameter
         *\brief Get camera parameter (Hamamatsu property)
         **/
-        std::string getParameter(int32 iProp);
+        std::string getParameter(std::string parameter_name);
 
         /**
-        *\fn  getParameters
+        *\fn  setParameter
         *\brief Set camera parameter (Hamamatsu property)
         **/
-        void setParameter(int32 iProp, double value);
+        void setParameter(std::string parameter_name, double value);
+    
+        //-
+        void initParametersMap();
+        void mapIdParameter(int32 parameter_id);
 
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
@@ -524,6 +528,7 @@ namespace lima
 	    Bin                         m_bin_max        ; /// maximum bining parameters
 	    TrigMode                    m_trig_mode      ;
 		map<int, string>			m_map_triggerMode;
+        std::map<string, int>            m_map_parameters ;
 
 		// Specific
 		unsigned int long			m_lost_frames_count;
