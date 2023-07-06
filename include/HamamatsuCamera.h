@@ -271,10 +271,12 @@ namespace lima
         std::string getParameter(std::string parameter_name);
 
         /**
-        *\fn  getParameters
+        *\fn  setParameter
         *\brief Set camera parameter (Hamamatsu property)
         **/
         void setParameter(std::string parameter_name, double value);
+    
+        //-
         void initParametersMap();
         void mapIdParameter(int32 parameter_id);
 

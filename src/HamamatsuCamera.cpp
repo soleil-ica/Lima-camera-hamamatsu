@@ -178,8 +178,8 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
     }
     else
     {
-        manage_error( deb, "Unable to initialize the camera (Check if it is switched on or if an other software is currently using it).");
-        THROW_HW_ERROR(Error) << "Unable to initialize the camera (Check if it is switched on or if an other software is currently using it).";
+        manage_error( deb, "Unable to initialize the camera (Check if it is already ON or if another software is currently using it).");
+        THROW_HW_ERROR(Error) << "Unable to initialize the camera (Check if it is already ON or if another software is currently using it).";
     }
 }
 
@@ -3338,32 +3338,26 @@ void Camera::setParameter(std::string parameter_name, double value)
     DEB_MEMBER_FUNCT();
 
 	DCAMERR err;
-
     int parameter_id = m_map_parameters[parameter_name];
-
     err = dcamprop_setvalue(m_camera_handle, parameter_id, value);
     if(failed(err))
     {
         if(err == DCAMERR_NOTSUPPORT)
         {
-            manage_error( deb, "Parameter is not supported", err, 
-                                "dcamprop_setvalue");
+            manage_error( deb, "Parameter is not supported", err, "dcamprop_setvalue");
             THROW_HW_ERROR(Error) << "Parameter is not supported";
         }
         else if (err == DCAMERR_INVALIDPARAM)
         {
-            manage_error( deb, "Invalid parameter", err, 
-                                "dcamprop_setvalue");
+            manage_error( deb, "Invalid parameter", err, "dcamprop_setvalue");
             THROW_HW_ERROR(Error) << "Invalid parameter";
         }
         else
         {
-            manage_error( deb, "Unable to set the parameter", err, 
-                                "dcamprop_setvalue");
+            manage_error( deb, "Unable to set the parameter", err, "dcamprop_setvalue");
             THROW_HW_ERROR(Error) << "Unable to set the parameter";
         }
     }
-
 }
 
 
