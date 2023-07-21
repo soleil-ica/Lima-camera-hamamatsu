@@ -8,8 +8,8 @@
     </parent>
 
     <groupId>fr.soleil.lib.Lima.Camera</groupId>
-    <artifactId>LimaHamamatsu-${aol}-shared-${mode}</artifactId>
-    <version>2.4.5</version>
+    <artifactId>LimaHamamatsu-amd64-Windows-msvc12-shared-${mode}</artifactId>
+    <version>2.4.6</version>
 
     <packaging>nar</packaging>
     <name>LimaHamamatsu</name>
@@ -29,7 +29,7 @@
     <dependencies>
         <dependency>
             <groupId>fr.soleil.lib</groupId>
-            <artifactId>LimaCore-${aol}-shared-${mode}</artifactId>
+            <artifactId>LimaCore-amd64-Windows-msvc12-shared-${mode}</artifactId>
             <version>1.7.11</version>
         </dependency>
     </dependencies>
