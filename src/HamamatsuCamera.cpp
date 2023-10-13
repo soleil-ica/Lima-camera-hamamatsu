@@ -1321,7 +1321,25 @@ void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readou
 short int Camera::getReadoutSpeed(void) const
 {
     DEB_MEMBER_FUNCT();
-    return m_read_mode;
+
+    DCAMERR err   ;
+    int32   read_mode = 0  ;
+    double  v  =   0.0;
+
+    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_READOUTSPEED, &v );
+    
+    if( failed(err) )
+    {
+        manage_trace( deb, "Unable to retrieve the readout speed value", err, "dcamprop_getvalue - DCAM_IDPROP_READOUTSPEED");
+    }
+    else    
+    {
+        read_mode = static_cast<int32>(v);
+    }
+
+    DEB_TRACE() << DEB_VAR1(read_mode);
+
+    return  read_mode;
 }
 
 //-----------------------------------------------------------------------------
