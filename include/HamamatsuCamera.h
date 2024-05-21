@@ -59,59 +59,59 @@ namespace lima
     namespace Hamamatsu
     {
     /* 
-    // Refactoring
-    struct TRIGGER
-    {
+	// Refactoring
+	struct TRIGGER
+	{
         enum TYPE
-        {
-            INPUT=0,
-            OUTPUT=1
-        }
-        enum NAME
-        {
-            ACTIVE=0,
+	    {
+		    INPUT=0,
+		    OUTPUT=1
+	    }
+        enum IDSTR
+	    {
+		    ACTIVE=0,
             DELAY,
             KIND,
             POLARITY,
-            SOURCE
-        }
+		    SOURCE
+	    }
 
-        TRIGGER::TYPE type;
-        TRIGGER::NAME name,
-        char[32] desc;
+		TRIGGER::TYPE type;
+        TRIGGER::IDSTR id,
+		char[32] desc;
 
-        TRIGGER(TRIGGER::TYPE arg_type, TRIGGER::NAME arg_name, char* arg_desc)
-        {
-            type = arg_type;
-            name = arg_name;
-            strcpy(desc, arg_desc);
-        }
-    }
+		TRIGGER(TRIGGER::TYPE arg_type, TRIGGER::IDSTR arg_id, char* arg_desc)
+		{
+			type = arg_type;
+            id = arg_id;
+			strcpy(desc, arg_desc);
+		}
+	}
 
-    #define INPUT_TRIGGER_ACTIVE    TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::NAME::ACTIVE, "Active")
-    #define INPUT_TRIGGER_POLARITY  TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::NAME::POLARITY, "Polarity")
+    #define INPUT_TRIGGER_ACTIVE    TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::IDSTR::ACTIVE, "Active")
+    #define INPUT_TRIGGER_POLARITY  TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::IDSTR::POLARITY, "Polarity")
 
-    #define OUTPUT_TRIGGER_DELAY    TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::NAME::DELAY, "Delay")
-    #define OUTPUT_TRIGGER_SOURCE   TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::NAME::SOURCE, "Source")
-    #define OUTPUT_TRIGGER_KIND     TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::NAME::KIND, "Kind")
-    #define OUTPUT_TRIGGER_POLARITY TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::NAME::POLARITY, "Polarity")
+    #define OUTPUT_TRIGGER_DELAY    TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::DELAY, "Delay")
+    #define OUTPUT_TRIGGER_SOURCE   TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::SOURCE, "Source")
+    #define OUTPUT_TRIGGER_KIND     TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::KIND, "Kind")
+    #define OUTPUT_TRIGGER_POLARITY TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::POLARITY, "Polarity")
     */
 
 /*******************************************************************
  * \class Camera
  * \brief object controlling the Hamamatsu camera via DCAM-SDK
  *******************************************************************/
-    class LIBHAMAMATSU_API Camera
-    {
-        DEB_CLASS_NAMESPC(DebModCamera, "Camera", "Hamamatsu");
-        friend class Interface;
+	class LIBHAMAMATSU_API Camera
+	{
+	    DEB_CLASS_NAMESPC(DebModCamera, "Camera", "Hamamatsu");
+	    friend class Interface;
 
     //-----------------------------------------------------------------------------
-    public:
-        enum Status 
+	public:
+	    enum Status 
         {
-            Ready, Exposure, Readout, Latency, Fault
-        };
+		    Ready, Exposure, Readout, Latency, Fault
+	    };
 
         typedef std::map<TrigMode, bool> trigOptionsMap;
 
@@ -175,16 +175,16 @@ namespace lima
         // Pixel Type
         enum Pixel_Type
         {
-            Pixel_Type_Not_Supported = 0,
+			Pixel_Type_Not_Supported = 0,
             Pixel_Type_Mono8    , // DCAM_PIXELTYPE_MONO8
             Pixel_Type_Mono16   , // DCAM_PIXELTYPE_MONO16
-            Pixel_Type_RGB24    , // DCAM_PIXELTYPE_RGB24
-            Pixel_Type_RGB48    , // DCAM_PIXELTYPE_RGB48
+			Pixel_Type_RGB24    , // DCAM_PIXELTYPE_RGB24
+			Pixel_Type_RGB48    , // DCAM_PIXELTYPE_RGB48
             Pixel_Type_BGR24    , // DCAM_PIXELTYPE_BGR24
-            Pixel_Type_BGR48      // DCAM_PIXELTYPE_BGR48
+            Pixel_Type_BGR48 	  // DCAM_PIXELTYPE_BGR48
         };
 
-        // Sensor Mode
+        // Scan Mode
         enum Scan_Mode
         {
             Scan_Mode_Not_Supported = 0   ,
@@ -196,28 +196,28 @@ namespace lima
         enum Input_Trigger_Active
         {
             Input_Trigger_Active_Not_Supported  ,
-            Input_Trigger_Active_Edge           , // DCAMPROP_TRIGGERACTIVE__EDGE           
-            Input_Trigger_Active_Level          , // DCAMPROP_TRIGGERACTIVE__LEVEL      
-            Input_Trigger_Active_SyncReadout      // DCAMPROP_TRIGGERACTIVE__SYNCREADOUT    
+            Input_Trigger_Active_Edge           , // DCAMPROP_TRIGGERACTIVE__EDGE			
+            Input_Trigger_Active_Level          , // DCAMPROP_TRIGGERACTIVE__LEVEL		
+            Input_Trigger_Active_SyncReadout      // DCAMPROP_TRIGGERACTIVE__SYNCREADOUT	
         };
 
         // relative to DCAM_IDPROP_TRIGGER_POLARITY
         enum Input_Trigger_Polarity
         {
             Input_Trigger_Polarity_Not_Supported  ,
-            Input_Trigger_Polarity_Negative       , // DCAMPROP_TRIGGERPOLARITY__NEGATIVE           
-            Input_Trigger_Polarity_Positive         // DCAMPROP_TRIGGERPOLARITY__POSITIVE       
+            Input_Trigger_Polarity_Negative       , // DCAMPROP_TRIGGERPOLARITY__NEGATIVE			
+            Input_Trigger_Polarity_Positive         // DCAMPROP_TRIGGERPOLARITY__POSITIVE		
         };
 
         // relative to DCAM_IDPROP_OUTPUTTRIGGER_KIND
         enum Output_Trigger_Kind
         {
             Output_Trigger_Kind_Not_Supported       ,
-            Output_Trigger_Kind_Low                 , // DCAMPROP_OUTPUTTRIGGER_KIND__LOW           
-            Output_Trigger_Kind_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_KIND__EXPOSURE      
-            Output_Trigger_Kind_Programmable        , // DCAMPROP_OUTPUTTRIGGER_KIND__PROGRAMABLE   
-            Output_Trigger_Kind_TriggerReady        , // DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY  
-            Output_Trigger_Kind_High                  // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH          //Not yet available with current SDK
+            Output_Trigger_Kind_Low                 , // DCAMPROP_OUTPUTTRIGGER_KIND__LOW			
+            Output_Trigger_Kind_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_KIND__EXPOSURE		
+            Output_Trigger_Kind_Programmable        , // DCAMPROP_OUTPUTTRIGGER_KIND__PROGRAMABLE	
+            Output_Trigger_Kind_TriggerReady        , // DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY	
+            Output_Trigger_Kind_High                  // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			//Not yet available with current SDK
 
         };
 
@@ -233,75 +233,75 @@ namespace lima
         enum Output_Trigger_Source
         {
             Output_Trigger_Source_Not_Supported       ,
-            Output_Trigger_Source_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_SOURCE__EXPOSURE          
-            Output_Trigger_Source_Readout_End         , // DCAMPROP_OUTPUTTRIGGER_SOURCE__READOUTEND        
-            Output_Trigger_Source_VSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__VSYNC 
-            Output_Trigger_Source_HSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__HSYNC 
-            Output_Trigger_Source_Trigger               // DCAMPROP_OUTPUTTRIGGER_SOURCE__TRIGGER           // Aavailable with ORCA QUEST
+            Output_Trigger_Source_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_SOURCE__EXPOSURE			
+            Output_Trigger_Source_Readout_End         , // DCAMPROP_OUTPUTTRIGGER_SOURCE__READOUTEND		
+            Output_Trigger_Source_VSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__VSYNC	
+            Output_Trigger_Source_HSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__HSYNC	
+            Output_Trigger_Source_Trigger               // DCAMPROP_OUTPUTTRIGGER_SOURCE__TRIGGER			// Aavailable with ORCA QUEST
         };
 
-    //-----------------------------------------------------------------------------
-    public:
-        Camera(const std::string& config_path,int camera_number=0, int frame_buffer_size=10);
-        ~Camera();
+	//-----------------------------------------------------------------------------
+	public:
+	    Camera(const std::string& config_path,int camera_number=0, int frame_buffer_size=10);
+	    ~Camera();
 
-        void startAcq();
-        void stopAcq();
-        void prepareAcq();
+	    void startAcq();
+	    void stopAcq();
+		void prepareAcq();
     
-        // -- detector info object
-        void getImageType(ImageType& type);
-        void setImageType(ImageType type);
+	    // -- detector info object
+	    void getImageType(ImageType& type);
+	    void setImageType(ImageType type);
 
-        void getDetectorType(std::string& type);
-        void getDetectorModel(std::string& model);
-        void getDetectorImageSize(Size& size);
-        void getDetectorMaxImageSize(Size& size);
+	    void getDetectorType(std::string& type);
+	    void getDetectorModel(std::string& model);
+	    void getDetectorImageSize(Size& size);
+		void getDetectorMaxImageSize(Size& size);
     
-        // -- Buffer control object
-        HwBufferCtrlObj* getBufferCtrlObj();
+	    // -- Buffer control object
+	    HwBufferCtrlObj* getBufferCtrlObj();
         HwEventCtrlObj * getEventCtrlObj ();
     
-        //-- Synch control object
-        bool checkTrigMode(TrigMode trig_mode);
-        void setTrigMode(TrigMode  mode);
-        void getTrigMode(TrigMode& mode);
+	    //-- Synch control object
+	    bool checkTrigMode(TrigMode trig_mode);
+	    void setTrigMode(TrigMode  mode);
+	    void getTrigMode(TrigMode& mode);
     
-        void setExpTime(double  exp_time);
-        void getExpTime(double& exp_time);
+	    void setExpTime(double  exp_time);
+	    void getExpTime(double& exp_time);
 
-        void setLatTime(double  lat_time);
-        void getLatTime(double& lat_time);
+	    void setLatTime(double  lat_time);
+	    void getLatTime(double& lat_time);
 
-        void getExposureTimeRange(double& min_expo, double& max_expo) const;
-        void getLatTimeRange(double& min_lat, double& max_lat) const;    
+	    void getExposureTimeRange(double& min_expo, double& max_expo) const;
+	    void getLatTimeRange(double& min_lat, double& max_lat) const;    
 
-        void setNbFrames(int  nb_frames);
-        void getNbFrames(int& nb_frames);
-        void getNbHwAcquiredFrames(int &nb_acq_frames);
+	    void setNbFrames(int  nb_frames);
+	    void getNbFrames(int& nb_frames);
+	    void getNbHwAcquiredFrames(int &nb_acq_frames);
 
-        void checkRoi(const Roi& set_roi, Roi& hw_roi);
-        void setRoi(const Roi& set_roi);
-        void getRoi(Roi& hw_roi);    
+	    void checkRoi(const Roi& set_roi, Roi& hw_roi);
+	    void setRoi(const Roi& set_roi);
+	    void getRoi(Roi& hw_roi);    
 
-        void checkBin(Bin&);
-        void setBin(const Bin&);
-        void getBin(Bin&);
-        bool isBinningAvailable();       
+	    void checkBin(Bin&);
+	    void setBin(const Bin&);
+	    void getBin(Bin&);
+	    bool isBinningAvailable();       
 
-        void getPixelSize(double& sizex, double& sizey);
+	    void getPixelSize(double& sizex, double& sizey);
     
-        Camera::Status getStatus();
+	    Camera::Status getStatus();
     
-        void reset();
+	    void reset();
 
-        // -- Hamamatsu specific
-        long HamamatsuError(string& strErr);
-        void initialiseController();
-        void setFastExtTrigger(bool flag);
-        void getFastExtTrigger(bool& flag);
-        void getLostFrames(unsigned long int& lost_frames); ///< [out] current lost frames
-        void getFPS(double& fps);                           ///< [out] last computed fps
+	    // -- Hamamatsu specific
+	    long HamamatsuError(string& strErr);
+	    void initialiseController();
+	    void setFastExtTrigger(bool flag);
+	    void getFastExtTrigger(bool& flag);
+		void getLostFrames(unsigned long int& lost_frames);	///< [out] current lost frames
+		void getFPS(double& fps);							///< [out] last computed fps
    
         void setSyncReadoutBlankMode(enum SyncReadOut_BlankMode in_sync_read_out_mode); ///< [in] type of sync-readout trigger's blank
 
@@ -332,9 +332,9 @@ namespace lima
         //void setChannelTrigger(int channel, int trigger_enum, TRIGGER trigger);
 
         // ICATHALES-587
-        // Get number of channels
-        long getNbMaxChannels(int32 idProp=-1);
-        
+		// Get number of channels
+		long getNbMaxChannels(int32 idProp=-1);
+		
         //-- Input Triggers  control is channel independant
         enum Camera::Input_Trigger_Active getInputTriggerActive(); ///< [in] channel to get
         enum Camera::Input_Trigger_Polarity getInputTriggerPolarity(); ///< [in] channel to get
@@ -348,7 +348,7 @@ namespace lima
         void setOutputTriggerKind(int channel,                                                          ///< [in] channel to set
                                   enum Camera::Output_Trigger_Kind in_output_trig_kind);                ///< [in] kind of the channel to set
         void setOutputTriggerSource(int in_channel,                                                     ///< [in] the channel to set
-                                    enum Camera::Output_Trigger_Source in_output_trig_source);          ///< [in] source of the channel to set
+                                    enum Camera::Output_Trigger_Source in_output_trig_source, bool raise_ex=true);          ///< [in] source of the channel to set
         void setOutputTriggerPolarity(int in_channel,                                                   ///< [in] the channel to set
                                       enum Camera::Output_Trigger_Polarity in_output_trig_polarity);    ///< [in] polarity of the channel to set
 
@@ -360,12 +360,9 @@ namespace lima
         // Sensor Mode
         enum Camera::Sensor_Mode getSensorMode(); ///< [in] channel to get
         void setSensorMode(enum Sensor_Mode in_sensor_mode);
-        
-        enum Camera::Pixel_Type getPixelType();
-        void setPixelType(enum Pixel_Type in_pixel_type);
-
-        enum Camera::Scan_Mode getScanMode();
-        void setScanMode(enum Scan_Mode in_scan_mode);
+		
+		enum Camera::Pixel_Type getPixelType();
+		void setPixelType(enum Pixel_Type in_pixel_type);
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
@@ -410,9 +407,9 @@ namespace lima
         void initParametersMap();
         void mapIdParameter(int32 parameter_id);
 
-        bool isOrcaQuest();
-        
-    private:
+		bool isOrcaQuest();
+		
+	private:
         void initDetectorModel();
         void initialiseOrcaQuest();
 
@@ -426,7 +423,7 @@ namespace lima
         std::string getCoolerStatusLabelFromStatus(enum Camera::Cooler_Status in_cooler_status);
 
         short int getReadoutSpeed(void) const;
-        void      setReadoutSpeed(const short int readout_speed); ///< [in]  new readout speed
+		void      setReadoutSpeed(const short int readout_speed); ///< [in]  new readout speed
 
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
@@ -442,52 +439,52 @@ namespace lima
 
         
 
-    //-----------------------------------------------------------------------------
-    private:
-        //-----------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------
+	private:
+		//-----------------------------------------------------------------------------
         // CameraThread class
-        //-----------------------------------------------------------------------------
+		//-----------------------------------------------------------------------------
         class CameraThread: public CmdThread
-        {
-            DEB_CLASS_NAMESPC(DebModCamera, "CameraThread", "Hamamatsu");
-        public:
-            // Status
+		{
+			DEB_CLASS_NAMESPC(DebModCamera, "CameraThread", "Hamamatsu");
+		public:
+			// Status
             enum
-            { 
-                Ready    = MaxThreadStatus, 
+			{ 
+				Ready    = MaxThreadStatus, 
                 Exposure                  , 
                 Readout                   , 
                 Latency                   ,
                 Fault                     ,
-            };
+			};
 
-            // Cmd
+			// Cmd
             enum
-            { 
-                StartAcq = MaxThreadCmd, 
-            };
+			{ 
+				StartAcq = MaxThreadCmd, 
+			};
 
-            CameraThread(Camera * cam);
+			CameraThread(Camera * cam);
 
             // destructor
             virtual ~CameraThread();
 
-            virtual void start();
+			virtual void start();
             virtual void abort();
 
             void abortCapture(void);
-            volatile bool m_force_stop;
+			volatile bool m_force_stop;
 
-        protected:
-            virtual void init   ();
-            virtual void execCmd(int cmd);
+		protected:
+			virtual void init   ();
+			virtual void execCmd(int cmd);
             
-        private:
-            void execStartAcq();
+		private:
+			void execStartAcq();
 
-            bool copyFrames(const int index_frame_begin,    ///< [in] index of the frame where to begin copy
-                            const int nb_frames_count  ,    ///< [in] number of frames to copy
-                            StdBufferCbMgr& buffer_mgr );   ///< [in] buffer manager object
+            bool copyFrames(const int index_frame_begin,	///< [in] index of the frame where to begin copy
+							const int nb_frames_count  ,	///< [in] number of frames to copy
+							StdBufferCbMgr& buffer_mgr );	///< [in] buffer manager object
 
             void checkStatusBeforeCapturing() const;
 
@@ -497,20 +494,20 @@ namespace lima
             void getTransfertInfo(int32 & frame_index,
                                   int32 & frame_count);
 
-            Camera*   m_cam        ;
+			Camera*   m_cam        ;
             HDCAMWAIT m_wait_handle;
 
-        };
-        friend class CameraThread;
+		};
+		friend class CameraThread;
 
-        //-----------------------------------------------------------------------------
+		//-----------------------------------------------------------------------------
         // Feature class used to get data informations of a property 
-        //-----------------------------------------------------------------------------
-        class FeatureInfos
-        {
-            DEB_CLASS_NAMESPC(DebModCamera, "FeatureInfos", "Hamamatsu");
+		//-----------------------------------------------------------------------------
+		class FeatureInfos
+		{
+			DEB_CLASS_NAMESPC(DebModCamera, "FeatureInfos", "Hamamatsu");
 
-            friend class Camera; // Camera class can access directly to private attributs like if they were public declared
+    		friend class Camera; // Camera class can access directly to private attributs like if they were public declared
 
         public:
             FeatureInfos();
@@ -522,9 +519,9 @@ namespace lima
 
             void RoundValue(int & inout_value)  const;
 
-        private:
-            string         m_name             ; ///< name of the feature    
-            double         m_min              ; ///< min value of the feature   
+		private:
+            string         m_name             ; ///< name of the feature	
+            double         m_min              ; ///< min value of the feature	
             double         m_max              ; ///< max value of the feature
             double         m_step             ; ///< minimum stepping between a value and the next
             double         m_default_value    ; ///< default value of the feature
@@ -538,13 +535,13 @@ namespace lima
             bool           m_is_readable      ; ///< is readable ?
             bool           m_has_view         ; ///< has view ?
             bool           m_has_auto_rounding; ///< has auto rounding ?
-            int32          m_max_view         ; ///< max view if supported
+            int32 		   m_max_view         ; ///< max view if supported
         };
 
-        //-----------------------------------------------------------------------------
-        // DCAM-SDK Helper
-        //-----------------------------------------------------------------------------
-        // TRACE METHODS
+		//-----------------------------------------------------------------------------
+		// DCAM-SDK Helper
+		//-----------------------------------------------------------------------------
+		// TRACE METHODS
         static std::string string_format_arg(const char* format, va_list args);
         static std::string string_format    (const char* format, ...);
 
@@ -586,7 +583,7 @@ namespace lima
                                                         va_list            args     ,  ///< [in] optional args (printf style) to merge with the opt string (NULL if not used)
                                                         bool               is_error ); ///< [in] true if traced like an error, false for a classic info trace
 
-        //-----------------------------------------------------------------------------
+		//-----------------------------------------------------------------------------
         void   execStopAcq();
 
         void   showCameraInfo      (HDCAM hd_cam); ///< [in] camera device id
@@ -601,18 +598,18 @@ namespace lima
                                        long  height   ,  ///< [in] vertical size
                                        int   view_index); ///< [in] View index [0...max view[. Use g_get_sub_array_do_not_use_view for general subarray 
 
-        bool   dcamex_getsubarrayrect( HDCAM   hd_cam    ,  ///< [in] camera handle
-                                       int32 & left     ,  ///< [in] left  (x)
-                                       int32 & top      ,  ///< [in] top   (y)
-                                       int32 & width    ,  ///< [in] horizontal size
-                                       int32 & height   ,  ///< [in] vertical size
+		bool   dcamex_getsubarrayrect( HDCAM   hd_cam    ,  ///< [in] camera handle
+									   int32 & left     ,  ///< [in] left  (x)
+									   int32 & top      ,  ///< [in] top   (y)
+									   int32 & width    ,  ///< [in] horizontal size
+									   int32 & height   ,  ///< [in] vertical size
                                        int     view_index); ///< [in] View index [0...max view[. Use -1 for general subarray 
 
-        long   dcamex_getimagewidth (const HDCAM hd_cam ); ///< [in] camera handle
-        
-        long   dcamex_getimageheight(const HDCAM hd_cam ); ///< [in] camera handle
+		long   dcamex_getimagewidth (const HDCAM hd_cam ); ///< [in] camera handle
+		
+		long   dcamex_getimageheight(const HDCAM hd_cam ); ///< [in] camera handle
 
-        long   dcamex_getbitsperchannel( HDCAM hd_cam );    ///< [in] camera handle
+		long   dcamex_getbitsperchannel( HDCAM hd_cam );    ///< [in] camera handle
 
         void   dcamex_setimagepixeltype( HDCAM hd_cam   ,  ///< [in] camera handle
                                         int   pixel_type); ///< [in] pixel type
@@ -620,7 +617,7 @@ namespace lima
         bool   dcamex_getfeatureinq( HDCAM          hd_cam      ,        ///< [in ] camera handle
                                      const string   feature_name,        ///< [in ] feature name
                                      long           id_feature  ,        ///< [in ] feature id
-                                     FeatureInfos & feature_obj ) const; ///< [out] feature informations class  
+                                     FeatureInfos & feature_obj ) const; ///< [out] feature informations class	
 
         bool dcamex_getpropertyvalues( HDCAM            hd_cam     ,        ///< [in ] camera handle
                                        DCAMPROP_ATTR    attr       ,        ///< [in ] attribut which contains the array base
@@ -642,60 +639,60 @@ namespace lima
 
         void setTriggerPolarity(enum Trigger_Polarity in_trigger_polarity) const; ///< [in] type of trigger polarity
 
-        // DCAM-SDK Helper end
-        bool  isBinningSupported(const int   bin_value); /// Check if a binning value is supported
+		// DCAM-SDK Helper end
+		bool  isBinningSupported(const int   bin_value); /// Check if a binning value is supported
         int32 GetBinningMode    (const int   bin_value); ///< [in] binning value to chck for
-        int   GetBinningFromMode(const int32 bin_mode );    ///< [in] binning mode to chck for
+        int   GetBinningFromMode(const int32 bin_mode );	///< [in] binning mode to chck for
 
-        vector<int> m_vectBinnings; /// list of available binning modes
-        
-        //-----------------------------------------------------------------------------
-        //- lima stuff
-        SoftBufferCtrlObj           m_buffer_ctrl_obj;
+		vector<int> m_vectBinnings; /// list of available binning modes
+		
+		//-----------------------------------------------------------------------------
+	    //- lima stuff
+	    SoftBufferCtrlObj	        m_buffer_ctrl_obj;
         HwEventCtrlObj              m_event_ctrl_obj ;
-        int                         m_nb_frames      ;    
-        Camera::Status              m_status         ;
-        int                         m_image_number   ;
-        int                         m_timeout        ;
-        double                      m_latency_time   ;
-        Roi                         m_roi            ; /// current roi parameters
-        Bin                         m_bin            ; /// current binning paramenters
-        Bin                         m_bin_max        ; /// maximum bining parameters
-        TrigMode                    m_trig_mode      ;
-        map<int, string>            m_map_triggerMode;
+	    int                         m_nb_frames      ;    
+	    Camera::Status              m_status         ;
+	    int                         m_image_number   ;
+	    int                         m_timeout        ;
+	    double                      m_latency_time   ;
+	    Roi                         m_roi            ; /// current roi parameters
+	    Bin                         m_bin            ; /// current binning paramenters
+	    Bin                         m_bin_max        ; /// maximum bining parameters
+	    TrigMode                    m_trig_mode      ;
+		map<int, string>			m_map_triggerMode;
         std::map<string, int>            m_map_parameters ;
 
-        // Specific
-        unsigned int long           m_lost_frames_count;
-        double                      m_fps              ;
+		// Specific
+		unsigned int long			m_lost_frames_count;
+		double						m_fps              ;
       
-        //- camera stuff 
-        string                      m_detector_model;
-        string                      m_detector_type ;
-        long                        m_depth         ;
+	    //- camera stuff 
+	    string                      m_detector_model;
+	    string                      m_detector_type ;
+		long						m_depth         ;
         long                        m_bytes_per_pixel;
-        long                        m_max_image_width, m_max_image_height;
+		long						m_max_image_width, m_max_image_height;
     
-        //- Hamamatsu SDK stuff
-        string                      m_config_path        ;
-        int                         m_camera_number      ;
-        HDCAM                       m_camera_handle      ;
-        DWORD                       m_camera_capabilities;
-        string                      m_camera_error_str   ;
-        int                         m_camera_error       ;
+	    //- Hamamatsu SDK stuff
+	    string                      m_config_path        ;
+	    int                         m_camera_number      ;
+	    HDCAM						m_camera_handle      ;
+	    DWORD				        m_camera_capabilities;
+	    string                      m_camera_error_str   ;
+	    int                         m_camera_error       ;
         int                         m_frame_buffer_size  ; // number of images in the DCAM internal buffer 
-           
-        bool                        m_fasttrigger        ; // ?
-        int                         m_temperature_sp     ;   
-        int                         m_read_mode          ;
-        int                         m_acq_mode           ;  
-        double                      m_exp_time           ;
-        double                      m_exp_time_max       ;
+    	   
+	    bool                        m_fasttrigger        ; // ?
+	    int                         m_temperature_sp     ;   
+	    int                         m_read_mode          ;
+	    int                         m_acq_mode           ;  
+	    double                      m_exp_time           ;
+	    double                      m_exp_time_max       ;
 
-        CameraThread                m_thread             ;
-        Mutex                       m_mutex_force_stop   ;
+		CameraThread 				m_thread             ;
+		Mutex						m_mutex_force_stop   ;
 
-        trigOptionsMap              m_map_trig_modes     ;
+	    trigOptionsMap              m_map_trig_modes     ;
 
         FeatureInfos                m_feature_pos_x      ; // property data to check the ROI
         FeatureInfos                m_feature_pos_y      ; // property data to check the ROI
@@ -706,20 +703,20 @@ namespace lima
         bool                        m_view_mode_enabled  ; // W-View mode with splitting image
         int                         m_view_number        ; // number of W-Views
         int                         m_max_views          ; // maximum number of views for this camera (if > 1 then W-View mode is supported) 
-        double                    * m_view_exp_time      ; // array of exposure value by view
+	    double                    * m_view_exp_time      ; // array of exposure value by view
 
         bool                        m_hdr_enabled        ; // high dynamic range activation latest value
 
-        //-----------------------------------------------------------------------------
+		//-----------------------------------------------------------------------------
         // Constants
-        //-----------------------------------------------------------------------------
+		//-----------------------------------------------------------------------------
         static const double g_orca_pixel_size              ;
         static const int    g_dcam_str_msg_size            ;
         static const int    g_get_sub_array_do_not_use_view;
 
         static const string g_trace_line_separator       ;
         static const string g_trace_little_line_separator;
-    };
+	};
     } // namespace Hamamatsu
 } // namespace lima
 
