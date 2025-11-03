@@ -70,8 +70,8 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 
 #define READOUTSPEED_SLOW_VALUE     1
 #define READOUTSPEED_NORMAL_VALUE   2
-#define READOUTSPEED_SLOW_NAME      "SLOW"
-#define READOUTSPEED_NORMAL_NAME    "NORMAL"
+#define READOUTSPEED_SLOW_NAME      "ULTRA QUIET"
+#define READOUTSPEED_NORMAL_NAME    "STANDARD"
 
 //-----------------------------------------------------------------------------
 ///  Ctor
