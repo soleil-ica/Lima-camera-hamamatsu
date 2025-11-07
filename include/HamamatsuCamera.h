@@ -251,12 +251,16 @@ namespace lima
         std::string getReadoutSpeedLabel(void);
         void        setReadoutSpeedLabel(const std::string & in_readout_speed_label);
 
+        std::string getSensorModeLabel(void);
+        void        setSensorModeLabel(const std::string & in_sensor_mode_label);
+
         bool isSensorTemperatureSupported(void);
         bool isTemperatureStatusSupported(void);
         bool isCoolerModeSupported       (void);
         bool isCoolerStatusSupported     (void);
         bool isHighDynamicRangeSupported (void);
         bool isReadoutSpeedSupported     (void);
+        bool isSensorModeSupported       (void);
 
         /**
         *\fn  getAllParameters
@@ -295,6 +299,12 @@ namespace lima
 
         std::string getReadoutSpeedLabelFromValue(const short int in_readout_speed) const;
         short int   getReadoutSpeedFromLabel     (const std::string & in_readout_speed_label) const;
+
+        short int getSensorMode(void) const;
+		void      setSensorMode(const short int sensor_mode); ///< [in]  new sensor mode
+
+        std::string getSensorModeLabelFromValue(const short int in_sensor_mode) const;
+        short int   getSensorModeFromLabel     (const std::string & in_sensor_mode_label) const;
 
         /**
         *\fn  getPropertyData

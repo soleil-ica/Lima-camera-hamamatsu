@@ -73,6 +73,11 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define READOUTSPEED_SLOW_NAME      "ULTRA QUIET"
 #define READOUTSPEED_NORMAL_NAME    "STANDARD"
 
+#define SENSORMODE_AREA_VALUE           1
+#define SENSORMODE_PROGRESSIVE_VALUE    12
+#define SENSORMODE_AREA_NAME            "AREA"
+#define SENSORMODE_PROGRESSIVE_NAME     "PROGRESSIVE"
+
 //-----------------------------------------------------------------------------
 ///  Ctor
 //-----------------------------------------------------------------------------
@@ -1404,6 +1409,158 @@ std::string Camera::getReadoutSpeedLabel(void)
 void Camera::setReadoutSpeedLabel(const std::string & in_readout_speed_label)
 {
     setReadoutSpeed(getReadoutSpeedFromLabel(in_readout_speed_label));
+}
+
+//=============================================================================
+// SENSOR MODE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the sensor mode support by the current detector
+//-----------------------------------------------------------------------------
+bool Camera::isSensorModeSupported(void)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    bool    supported;
+    double  temp;
+    
+    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &temp );
+    
+    if( failed(err) )
+    {
+        if((err == DCAMERR_INVALIDPROPERTYID)||(err == DCAMERR_NOTSUPPORT))
+        {
+            supported = false;
+        }
+        else
+        {
+            manage_trace( deb, "Unable to retrieve the sensor mode", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORMODE");
+            THROW_HW_ERROR(Error) << "Unable to retrieve the sensor mode";
+        }
+    }    
+    else
+    {
+        supported = true;
+    }
+
+    return supported;
+}
+
+//-----------------------------------------------------------------------------
+/// Set the sensor mode value
+/*!
+@remark possible values are 1 or 2
+*/
+//-----------------------------------------------------------------------------
+void Camera::setSensorMode(const short int sensor_mode) ///< [in] new sensor mode
+{
+    DEB_MEMBER_FUNCT();
+    DEB_PARAM() << DEB_VAR1(sensor_mode);
+
+    DCAMERR err;
+
+    // set the sensor mode
+    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, static_cast<double>(sensor_mode) );
+    if( failed(err) )
+    {
+        manage_error( deb, "Failed to set sensor mode", err, 
+                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_SUBARRAYVPOS, VALUE=%d",static_cast<int>(sensor_mode));
+        THROW_HW_ERROR(Error) << "Failed to set sensor mode";
+    }
+
+    m_read_mode = sensor_mode;
+}
+
+//-----------------------------------------------------------------------------
+/// Get the sensor mode value
+//-----------------------------------------------------------------------------
+short int Camera::getSensorMode(void) const
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err   ;
+    int32   read_mode = 0  ;
+    double  v  =   0.0;
+
+    err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &v );
+    
+    if( failed(err) )
+    {
+        manage_trace( deb, "Unable to retrieve the sensor mode value", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORMODE");
+    }
+    else    
+    {
+        read_mode = static_cast<int32>(v);
+    }
+
+    DEB_TRACE() << DEB_VAR1(read_mode);
+
+    return  read_mode;
+}
+
+//-----------------------------------------------------------------------------
+// Get the label of a sensor mode.
+//-----------------------------------------------------------------------------
+std::string Camera::getSensorModeLabelFromValue(const short int in_sensor_mode) const
+{
+    std::string label = "";
+
+    switch (in_sensor_mode)
+    {
+        case SENSORMODE_AREA_VALUE  : label = SENSORMODE_AREA_NAME  ; break;
+        case SENSORMODE_PROGRESSIVE_VALUE: label = SENSORMODE_PROGRESSIVE_NAME; break;
+        default: label = "ERROR"; break;
+    }
+
+    return label;
+}
+
+//-----------------------------------------------------------------------------
+// Get the sensor mode from a label.
+//-----------------------------------------------------------------------------
+short int Camera::getSensorModeFromLabel(const std::string & in_sensor_mode_label) const
+{
+    DEB_MEMBER_FUNCT();
+
+    short int   sensor_mode = SENSORMODE_AREA_VALUE;
+    std::string label         = in_sensor_mode_label;
+
+	transform(label.begin(), label.end(), label.begin(), ::toupper);
+
+    if (label == SENSORMODE_AREA_NAME)
+    {
+        sensor_mode = SENSORMODE_AREA_VALUE;
+    }
+    else
+    if (label == SENSORMODE_PROGRESSIVE_NAME)
+    {
+        sensor_mode = SENSORMODE_PROGRESSIVE_VALUE;
+    }
+    else
+	{			
+		string user_msg;
+        user_msg = string("Available sensor modes are:\n- ") + string(SENSORMODE_AREA_NAME) + string("\n- ") + string(SENSORMODE_PROGRESSIVE_NAME);
+        THROW_HW_ERROR(Error) << user_msg.c_str();
+	}
+
+    return sensor_mode;
+}
+
+//-----------------------------------------------------------------------------
+// Get the sensor mode label.
+//-----------------------------------------------------------------------------
+std::string Camera::getSensorModeLabel(void)
+{
+    return getSensorModeLabelFromValue(getSensorMode());
+}
+
+//-----------------------------------------------------------------------------
+// Set the sensor mode label.
+//-----------------------------------------------------------------------------
+void Camera::setSensorModeLabel(const std::string & in_sensor_mode_label)
+{
+    setSensorMode(getSensorModeFromLabel(in_sensor_mode_label));
 }
 
 //=============================================================================
