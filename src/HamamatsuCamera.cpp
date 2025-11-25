@@ -78,6 +78,7 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define SENSORMODE_AREA_NAME            "AREA"
 #define SENSORMODE_PROGRESSIVE_NAME     "PROGRESSIVE"
 
+#define ORCA_QUEST                  "C15550-20UP"
 //-----------------------------------------------------------------------------
 ///  Ctor
 //-----------------------------------------------------------------------------
@@ -107,6 +108,7 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
     m_config_path       = config_path  ;
     m_camera_number     = camera_number;
     m_frame_buffer_size = frame_buffer_size;
+    m_detector_model = "";
   
     m_map_triggerMode[IntTrig       ] = "IntTrig"       ;
     m_map_triggerMode[IntTrigMult   ] = "IntTrigMult"   ;
@@ -120,72 +122,78 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
     // --- Get available cameras and select the choosen one.    
     m_camera_handle = dcam_init_open(camera_number);
 
-    if (NULL != m_camera_handle)
-    {
-        // --- Initialise deeper parameters of the controller                
-        initialiseController();
-
-        // retrying the maximum number of views for this camera
-        // Will be also used to know if W-View mode is possible
-        m_max_views = getMaxNumberofViews();
-        
-        if(m_max_views > 1)
-        {
-            m_view_exp_time = new double[m_max_views];
-
-            for(int view_index = 0 ; view_index < m_max_views ; view_index++)
-            {
-                m_view_exp_time[view_index] = m_exp_time; // by default
-            }
-        }
-        else
-        {
-            m_view_exp_time = NULL;
-        }
-
-        // --- BIN already set to 1,1 above.
-        // --- Hamamatsu sets the ROI by starting coordinates at 1 and not 0 !!!!
-        Size size_max;
-        getDetectorImageSize(size_max);
-        Roi a_roi = Roi(0,0, size_max.getWidth(), size_max.getHeight());
-
-        // Store max image size
-        m_max_image_width  = size_max.getWidth ();
-        m_max_image_height = size_max.getHeight();
-
-        // Display max image size
-        DEB_TRACE() << "Detector max width: " << m_max_image_width ;
-        DEB_TRACE() << "Detector max height:" << m_max_image_height;
-
-        // sets no view mode by default
-        m_view_mode_enabled = false; // W-View mode with splitting image
-        m_view_number      = 0    ; // number of W-Views
-
-        setViewMode(false, 0);
-
-        // --- setRoi applies both bin and roi
-        DEB_TRACE() << "Set the ROI to full frame: "<< a_roi;
-        setRoi(a_roi);        
-        
-        // --- Get the maximum exposure time allowed and set default
-        setExpTime(m_exp_time);
-        
-        // --- Set detector for software single image mode    
-        setTrigMode(IntTrig);
-        
-        m_nb_frames = 1;
-
-        // --- Initialize the map of the camera parameters
-        initParametersMap();
-
-        // --- finally start the acq thread
-        m_thread.start();
-    }
-    else
+    if (NULL == m_camera_handle)
     {
         manage_error( deb, "Unable to initialize the camera (Check if it is already ON or if another software is currently using it).");
         THROW_HW_ERROR(Error) << "Unable to initialize the camera (Check if it is already ON or if another software is currently using it).";
     }
+    
+    // ICATHALES-587
+    initDetectorModel();
+
+    // --- Initialise deeper parameters of the controller                
+    initialiseController();
+
+    if (isOrcaQuest())
+    {
+        initialiseOrcaQuest();
+    }
+
+    // retrying the maximum number of views for this camera
+    // Will be also used to know if W-View mode is possible
+    m_max_views = getMaxNumberofViews();
+    
+    if(m_max_views > 1)
+    {
+        m_view_exp_time = new double[m_max_views];
+
+        for(int view_index = 0 ; view_index < m_max_views ; view_index++)
+        {
+            m_view_exp_time[view_index] = m_exp_time; // by default
+        }
+    }
+    else
+    {
+        m_view_exp_time = NULL;
+    }
+
+    // --- BIN already set to 1,1 above.
+    // --- Hamamatsu sets the ROI by starting coordinates at 1 and not 0 !!!!
+    Size size_max;
+    getDetectorImageSize(size_max);
+    Roi a_roi = Roi(0,0, size_max.getWidth(), size_max.getHeight());
+
+    // Store max image size
+    m_max_image_width  = size_max.getWidth ();
+    m_max_image_height = size_max.getHeight();
+
+    // Display max image size
+    DEB_TRACE() << "Detector max width: " << m_max_image_width ;
+    DEB_TRACE() << "Detector max height:" << m_max_image_height;
+
+    // sets no view mode by default
+    m_view_mode_enabled = false; // W-View mode with splitting image
+    m_view_number      = 0    ; // number of W-Views
+
+    setViewMode(false, 0);
+
+    // --- setRoi applies both bin and roi
+    DEB_TRACE() << "Set the ROI to full frame: "<< a_roi;
+    setRoi(a_roi);        
+    
+    // --- Get the maximum exposure time allowed and set default
+    setExpTime(m_exp_time);
+    
+    // --- Set detector for software single image mode    
+    setTrigMode(IntTrig);
+    
+    m_nb_frames = 1;
+
+    // --- Initialize the map of the camera parameters
+    initParametersMap();
+
+    // --- finally start the acq thread
+    m_thread.start();
 }
 
 //-----------------------------------------------------------------------------
@@ -224,6 +232,33 @@ Camera::~Camera()
         delete [] m_view_exp_time;
 
     DEB_TRACE() << "Camera destructor done.";
+}
+
+// ICATHALES-587
+void Camera::initDetectorModel()
+{
+	DEB_MEMBER_FUNCT();
+	
+    char model_str[MAX_PATH];
+	DCAMERR err;
+
+    DCAMDEV_STRING	param;
+	memset( &param, 0, sizeof(param) );
+	param.size		= sizeof(param);
+	param.text		= model_str;
+	param.textbytes	= sizeof(model_str);
+	param.iString	= DCAM_IDSTR_MODEL;
+	
+	err = dcamdev_getstring( m_camera_handle, &param );
+    if (failed(err))
+    {
+        manage_error(deb, "Cannot get detector model", err, "dcamdev_getstring", "IDSTR=DCAM_IDSTR_MODEL");
+    }
+    else
+	{
+        m_detector_model = model_str;
+		DEB_TRACE() << "m_detector_model = " << m_detector_model;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -279,6 +314,7 @@ void Camera::getImageType(ImageType& type)
         switch( bits_type )
         {
             case 8 :  type = Bpp8 ; break;
+            case 12:  type = Bpp12; break;
             case 16:  type = Bpp16; break;
             case 32:  type = Bpp32; break;
             default:
@@ -304,19 +340,38 @@ void Camera::setImageType(ImageType type)
     DEB_TRACE() << "Camera::setImageType - " << DEB_VAR1(type);
     switch(type)
     {
+        case Bpp8:
+        {
+            m_depth    = 8;
+            m_bytes_per_pixel = 1;
+            break;
+        }
+        case Bpp12:
+        {
+            m_depth    = 12;
+            m_bytes_per_pixel = 2;
+            break;
+        }
         case Bpp16:
         {
             m_depth    = 16;
+            m_bytes_per_pixel = 2;
+            break;
+        }
+        case Bpp32:
+        {
+            m_depth    = 32;
+            m_bytes_per_pixel = 4;
             break;
         }
         default:
-            manage_error( deb, "This pixel format of the camera is not managed, only 16 bits cameras are already managed!");
-            THROW_HW_ERROR(Error) << "This pixel format of the camera is not managed, only 16 bits cameras are already managed!";
+            manage_error( deb, "This pixel format of the camera is not managed, only 16, 12 and 8 bits cameras are already managed!");
+            THROW_HW_ERROR(Error) << "This pixel format of the camera is not managed, only 16, 12 AND 8 bits cameras are already managed!";
             break;
     }
 
     DEB_TRACE() << "SetImageType: " << m_depth;
-    m_bytes_per_pixel = m_depth / 8;
+    //m_bytes_per_pixel = m_depth / 8;
 }
 
 //-----------------------------------------------------------------------------
@@ -1054,6 +1109,14 @@ void Camera::reset()
     return;
 }
 
+bool Camera::isOrcaQuest()
+{
+    std::string model = m_detector_model;
+    transform(model.begin(), model.end(), model.begin(), ::toupper);
+    std::size_t pos = model.find("C15550-20UP");
+    return pos != std::string::npos;
+}
+
 //-----------------------------------------------------------------------------
 ///    initialise controller with speeds and preamp gain
 //-----------------------------------------------------------------------------
@@ -1240,6 +1303,81 @@ void Camera::initialiseController()
 }
 
 //-----------------------------------------------------------------------------
+///    initialise controller with speeds and preamp gain
+//-----------------------------------------------------------------------------
+
+void Camera::initialiseOrcaQuest()
+{
+    DEB_MEMBER_FUNCT();
+
+    //---------------------------------------------------------------------
+    // Create the list of available trigger modes from camera capabilities
+    // inputtrigger active
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    FeatureInfos inputtrigger_active_feature_obj;   
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERACTIVE", DCAM_IDPROP_TRIGGERACTIVE, inputtrigger_active_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get inputtrigger active modes");
+        THROW_HW_ERROR(Error) << "Failed to get inputtrigger active modes";
+    }
+    inputtrigger_active_feature_obj.traceModePossibleValues();
+
+    //---------------------------------------------------------------------
+    // Create the list of available trigger modes from camera capabilities
+    // inputtrigger polarity
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    FeatureInfos inputtrigger_polarity_feature_obj;   
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_TRIGGERPOLARITY", DCAM_IDPROP_TRIGGERPOLARITY, inputtrigger_polarity_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get inputtrigger polarity modes");
+        THROW_HW_ERROR(Error) << "Failed to get inputtrigger polarity modes";
+    }
+    inputtrigger_polarity_feature_obj.traceModePossibleValues();
+
+    // Output triggers
+    FeatureInfos outputtrigger_delay_feature_obj;
+    FeatureInfos outputtrigger_source_feature_obj;
+    FeatureInfos outputtrigger_kind_feature_obj;
+    FeatureInfos outputtrigger_polarity_feature_obj;
+
+    // outputtrigger delay
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_OUTPUTTRIGGER_DELAY", DCAM_IDPROP_OUTPUTTRIGGER_DELAY, outputtrigger_delay_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get outputtrigger delay modes");
+        THROW_HW_ERROR(Error) << "Failed to get outputtrigger delay modes";
+    }
+    outputtrigger_delay_feature_obj.traceModePossibleValues();
+
+    // outputtrigger source
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_OUTPUTTRIGGER_SOURCE", DCAM_IDPROP_OUTPUTTRIGGER_SOURCE, outputtrigger_source_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get outputtrigger source modes");
+        THROW_HW_ERROR(Error) << "Failed to get outputtrigger source modes";
+    }
+    outputtrigger_source_feature_obj.traceModePossibleValues();
+
+    // outputtrigger kind
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_OUTPUTTRIGGER_KIND", DCAM_IDPROP_OUTPUTTRIGGER_KIND, outputtrigger_kind_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get outputtrigger kind modes");
+        THROW_HW_ERROR(Error) << "Failed to get outputtrigger kind modes";
+    }
+    outputtrigger_kind_feature_obj.traceModePossibleValues();
+
+    // outputtrigger polarity
+    DEB_TRACE() << g_trace_line_separator.c_str();
+    if( !dcamex_getfeatureinq( m_camera_handle, "DCAM_IDPROP_OUTPUTTRIGGER_POLARITY", DCAM_IDPROP_OUTPUTTRIGGER_POLARITY, outputtrigger_polarity_feature_obj ) )
+    {
+        manage_error( deb, "Failed to get outputtrigger polarity modes");
+        THROW_HW_ERROR(Error) << "Failed to get outputtrigger polarity modes";
+    }
+    outputtrigger_polarity_feature_obj.traceModePossibleValues();
+}
+
+//-----------------------------------------------------------------------------
 /// Get the dcamdsk trigger mode value associated to the given Lima TrigMode 
 /*!
 sets dcamdsk trigger option with its property.
@@ -1328,7 +1466,7 @@ short int Camera::getReadoutSpeed(void) const
     DEB_MEMBER_FUNCT();
 
     DCAMERR err   ;
-    int32   read_mode = 0  ;
+    short   read_mode = 0  ;
     double  v  =   0.0;
 
     err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_READOUTSPEED, &v );
@@ -1339,10 +1477,10 @@ short int Camera::getReadoutSpeed(void) const
     }
     else    
     {
-        read_mode = static_cast<int32>(v);
+        read_mode = static_cast<short>(v);
     }
 
-    DEB_TRACE() << DEB_VAR1(read_mode);
+    //DEB_TRACE() << DEB_VAR1(read_mode);
 
     return  read_mode;
 }
@@ -2773,10 +2911,10 @@ double Camera::getSensorTemperature(void)
             THROW_HW_ERROR(Error) << "Unable to retrieve the sensor temperature";
         }
     }    
-    else
+    /*else
     {
         DEB_TRACE() << DEB_VAR1(temperature);
-    }
+    }*/
     
     return temperature;
 }
@@ -2819,7 +2957,7 @@ enum Camera::Cooler_Mode Camera::getCoolerMode(void)
     {
         int32 nMode = static_cast<int32>(temp);
 
-        DEB_TRACE() << DEB_VAR1(nMode);
+        //DEB_TRACE() << DEB_VAR1(nMode);
 
         switch (nMode)
         {
@@ -2898,7 +3036,7 @@ enum Camera::Temperature_Status Camera::getTemperatureStatus(void)
     {
         int32 nMode = static_cast<int32>(temp);
 
-        DEB_TRACE() << DEB_VAR1(nMode);
+        //DEB_TRACE() << DEB_VAR1(nMode);
 
         switch (nMode)
         {
@@ -3004,7 +3142,7 @@ enum Camera::Cooler_Status Camera::getCoolerStatus(void)
     {
         int32 nMode = static_cast<int32>(temp);
 
-        DEB_TRACE() << DEB_VAR1(nMode);
+        //DEB_TRACE() << DEB_VAR1(nMode);
 
         switch (nMode)
         {
@@ -3156,6 +3294,527 @@ HwEventCtrlObj* Camera::getEventCtrlObj()
     return &m_event_ctrl_obj;
 }
 
+/*************************************************************************
+// ICATHALES-587
+*************************************************************************/
+// get property attribute
+long Camera::getNbMaxChannels(int32 idProp)
+{
+	DEB_MEMBER_FUNCT();
+	
+    long nbOfChannels = 1;
+    // get property attribute
+    DCAMPROP_ATTR	basepropattr;
+    memset( &basepropattr, 0, sizeof(basepropattr) );
+    basepropattr.cbSize	= sizeof(basepropattr);
+	
+	if (idProp == -1)
+		basepropattr.iProp = DCAM_IDPROP__CHANNEL;
+	else
+		basepropattr.iProp = idProp;
+	
+    DCAMERR err;
+    err = dcamprop_getattr( m_camera_handle, &basepropattr );
+    if( !failed(err) )
+    {
+        nbOfChannels = basepropattr.nMaxChannel;
+		DEB_TRACE() << "getNbMaxChannels(" << idProp << ") : Number of channels = " << nbOfChannels;
+		DEB_TRACE() << "getNbMaxChannels(" << idProp << ") : iProp_ArrayBase = " << basepropattr.iProp_ArrayBase;
+		DEB_TRACE() << "getNbMaxChannels(" << idProp << ") : iProp_NumberOfElement = " << basepropattr.iProp_NumberOfElement;
+    }
+    else
+	{
+        manage_trace( deb, "Unable to get attr number of channels", err, "dcamprop_getattr - DCAM_IDPROP__CHANNEL");
+    }
+    return nbOfChannels;
+}
+
+// Sensor Mode
+//-----------------------------------------------------------------------------
+/// This property allows you to get the sensor mode of the camera. 
+//-----------------------------------------------------------------------------
+enum Camera::Sensor_Mode Camera::getSensorMode()
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    double  temp;
+    Camera::Sensor_Mode sensor_mode = Camera::Sensor_Mode::Sensor_Mode_Not_Supported;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &temp );      
+	if( failed(err) )
+	{
+		manage_trace( deb, "Unable to retrieve the sensor mode", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORMODE");
+		THROW_HW_ERROR(Error) << "Unable to retrieve the sensor mode";
+	}    
+	else
+	{
+		int32 mode = static_cast<int32>(temp);
+		switch(mode)
+		{
+			case DCAMPROP_SENSORMODE__AREA          : sensor_mode = Sensor_Mode_Area            ; break;
+			case DCAMPROP_SENSORMODE__LINE          : sensor_mode = Sensor_Mode_Line            ; break;
+			case DCAMPROP_SENSORMODE__TDI           : sensor_mode = Sensor_Mode_TDI             ; break;
+			case DCAMPROP_SENSORMODE__TDI_EXTENDED  : sensor_mode = Sensor_Mode_TDI_Extented    ; break;
+			case DCAMPROP_SENSORMODE__PROGRESSIVE   : sensor_mode = Sensor_Mode_Progressive     ; break;
+			default:
+				manage_trace( deb, "The read sensor mode is unknown!", err, "dcamprop_getvalue - DCAM_IDPROP_SENSORMODE");
+		}
+		//DEB_TRACE() << "getSensorMode() - temp=" << temp << ", mode=" << mode;
+	}
+    return sensor_mode;
+}
+
+//-----------------------------------------------------------------------------
+/// This property allows you to specify the sensor mode of the camera.
+/// Mode PNR (Photon Number Resolving) not found.
+//-----------------------------------------------------------------------------
+void Camera::setSensorMode(enum Sensor_Mode in_sensor_mode)
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    double temp;
+    switch(in_sensor_mode)
+    {
+        case Sensor_Mode_Area         : temp = static_cast<double>(DCAMPROP_SENSORMODE__AREA)            ; break;
+        case Sensor_Mode_Line         : temp = static_cast<double>(DCAMPROP_SENSORMODE__LINE)            ; break;
+        case Sensor_Mode_TDI          : temp = static_cast<double>(DCAMPROP_SENSORMODE__TDI)             ; break;
+        case Sensor_Mode_TDI_Extented : temp = static_cast<double>(DCAMPROP_SENSORMODE__TDI_EXTENDED)    ; break;
+        case Sensor_Mode_Progressive  : temp = static_cast<double>(DCAMPROP_SENSORMODE__PROGRESSIVE)     ; break;
+        default:
+        {
+            manage_error( deb,  "Unable to set the sensor mode",
+                                DCAMERR_NONE, 
+                                "",
+                                "in_sensor_mode is unknown %d",
+                                static_cast<int>(in_sensor_mode));
+
+            THROW_HW_ERROR(Error) << "Unable to set the sensor mode";
+        }
+    }
+    // set the value
+    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, temp);
+    if( failed(err) )
+    {
+        manage_error( deb, "Cannot set sensor mode", err, 
+                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_SENSORMODE, VALUE=%d", static_cast<int>(temp));
+		THROW_HW_ERROR(Error) << "Cannot set sensor mode";
+
+    }
+
+    manage_trace( deb, "Changed sensor mode", DCAMERR_NONE, NULL, "%d", (int)in_sensor_mode );
+}
+
+//-----------------------------------------------------------------------------
+/// This property allows you to get the image pixel type. 
+//-----------------------------------------------------------------------------
+enum Camera::Pixel_Type Camera::getPixelType()
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    double  temp;
+    Camera::Pixel_Type pixel_type = Camera::Pixel_Type::Pixel_Type_Not_Supported;
+    
+	err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_IMAGE_PIXELTYPE, &temp );        
+	if( failed(err) )
+	{
+		manage_trace( deb, "Unable to retrieve the pixel type", err, "dcamprop_getvalue - DCAM_IDPROP_IMAGE_PIXELTYPE");
+		THROW_HW_ERROR(Error) << "Unable to retrieve the pixel type";
+	}    
+	else
+	{
+		int32 result = static_cast<int32>(temp);
+		switch(result)
+		{
+			case DCAM_PIXELTYPE_MONO8 : pixel_type = Pixel_Type_Mono8  ; break;
+			case DCAM_PIXELTYPE_MONO16: pixel_type = Pixel_Type_Mono16 ; break;
+			case DCAM_PIXELTYPE_RGB24 : pixel_type = Pixel_Type_RGB24  ; break;
+			case DCAM_PIXELTYPE_RGB48 : pixel_type = Pixel_Type_RGB48  ; break;
+			case DCAM_PIXELTYPE_BGR24 : pixel_type = Pixel_Type_BGR24  ; break;
+			case DCAM_PIXELTYPE_BGR48 : pixel_type = Pixel_Type_BGR48  ; break;
+			default:
+				manage_trace( deb, "Unknown read pixel type", err, "dcamprop_getvalue - DCAM_IDPROP_IMAGE_PIXELTYPE");
+		}
+		//DEB_TRACE() << "getPixelType() - temp=" << temp << ", result=" << result;
+	}
+    return pixel_type;
+}
+
+//-----------------------------------------------------------------------------
+/// This property allows you to choose pixel data format.
+//-----------------------------------------------------------------------------
+void Camera::setPixelType(enum Pixel_Type in_pixel_type)
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::setPixelType(" << (int)in_pixel_type << ")";
+	
+    DCAMERR err;
+    double temp;
+    switch(in_pixel_type)
+    {
+        case Pixel_Type_Mono8 : temp = static_cast<double>(DCAM_PIXELTYPE_MONO8) ; break;
+        case Pixel_Type_Mono16: temp = static_cast<double>(DCAM_PIXELTYPE_MONO16); break;
+        case Pixel_Type_RGB24 : temp = static_cast<double>(DCAM_PIXELTYPE_RGB24) ; break;
+        case Pixel_Type_RGB48 : temp = static_cast<double>(DCAM_PIXELTYPE_RGB48) ; break;
+        case Pixel_Type_BGR24 : temp = static_cast<double>(DCAM_PIXELTYPE_BGR24) ; break;
+		case Pixel_Type_BGR48 : temp = static_cast<double>(DCAM_PIXELTYPE_BGR48) ; break;
+        default:
+        {
+            manage_error( deb,  "Unknown pixel type set value",
+                                DCAMERR_NONE, 
+                                "",
+                                "in_pixel_type is unknown %d",
+                                static_cast<int>(in_pixel_type));
+
+            THROW_HW_ERROR(Error) << "Unable to set the pixel type";
+        }
+    }
+    // set the value
+    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_IMAGE_PIXELTYPE, temp);
+    if( failed(err) )
+    {
+        manage_error( deb, "Cannot set pixel type", err, 
+                      "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_IMAGE_PIXELTYPE, VALUE=%d", static_cast<int>(temp));
+        THROW_HW_ERROR(Error) << "Cannot set pixel type";
+    }
+    manage_trace( deb, "Changed pixel type to ", DCAMERR_NONE, NULL, "%d", (int)in_pixel_type);
+}
+
+//=============================================================================
+// INPUT TRIGGER ACTIVE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the input trigger active of given channel by the current detector
+//-----------------------------------------------------------------------------
+enum Camera::Input_Trigger_Active Camera::getInputTriggerActive()
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    enum Input_Trigger_Active active = Camera::Input_Trigger_Active_Not_Supported;
+
+	//Get the trigger active value
+	double tmp = 99;
+	err = dcamprop_getvalue(m_camera_handle, DCAM_IDPROP_TRIGGERACTIVE, &tmp);
+	if(!failed(err))
+	{                
+		int32 value = static_cast<int32>(tmp);
+		switch(value) 
+		{
+			case DCAMPROP_TRIGGERACTIVE__EDGE        : active = Camera::Input_Trigger_Active_Edge       ; break;
+			case DCAMPROP_TRIGGERACTIVE__LEVEL       : active = Camera::Input_Trigger_Active_Level      ; break;
+			case DCAMPROP_TRIGGERACTIVE__SYNCREADOUT : active = Camera::Input_Trigger_Active_SyncReadout; break;
+			default: break; // result will be Input_Trigger_Active_Not_Supported
+		}
+	} //else TODO
+
+    return active;
+}
+
+/* Refactoring
+int Camera::getChannelTrigger(TRIGGER trigger, int channel)
+{
+    switch(trigger.type) 
+    {
+        case TRIGGER::TYPE::INPUT:
+        {
+            switch(trigger.id)
+            {
+                case TRIGGER::NAME::ACTIVE: 
+                    return getInputTriggerActive(); 
+                case TRIGGER::NAME::POLARITY: 
+                    return getInputTriggerPolarity();
+                default: break;
+            }
+        } break;
+        case TRIGGER::TYPE::OUTPUT:
+        {
+           switch(trigger.id)
+            {
+                case TRIGGER::NAME::DELAY: 
+                    return getOutputTriggerDelay(channel); 
+                case TRIGGER::NAME::KIND: 
+                    return getOutputTriggerKind(channel); 
+                case TRIGGER::NAME::POLARITY: 
+                    return getOutputTriggerPolarity(channel); 
+                case TRIGGER::NAME::SOURCE: 
+                return getOutputTriggerSource(channel); 
+                default: break;
+            }
+         } break;
+         default : break;
+    }
+    return -1;
+}
+
+void Camera::setChannelTrigger(TRIGGER trigger, int trigger_value, int channel)
+{
+    switch(trigger.type) 
+    {
+        case TRIGGER::TYPE::INPUT:
+        {
+            switch(trigger.id)
+            {
+                case TRIGGER::NAME::ACTIVE: setInputTriggerActive(trigger_value); break;
+                case TRIGGER::NAME::POLARITY: setInputTriggerPolarity(trigger_value); break;
+                default: break;
+            }
+        } break;
+        case TRIGGER::TYPE::OUTPUT:
+        {
+           switch(trigger.id)
+            {
+                case TRIGGER::NAME::DELAY: setOutputTriggerDelay(channel, trigger_value); break;
+                case TRIGGER::NAME::KIND: setOutputTriggerKind(channel, trigger_value); break;
+                case TRIGGER::NAME::POLARITY: setOutputTriggerPolarity(channel, trigger_value); break;
+                case TRIGGER::NAME::SOURCE: setOutputTriggerSource(channel, trigger_value); break;
+                default: break;
+            }
+         } break;
+    }
+}
+*/
+
+//-----------------------------------------------------------------------------
+/// Set the input trigger active of given channel by the current detector
+//-----------------------------------------------------------------------------
+void Camera::setInputTriggerActive(enum Input_Trigger_Active in_input_trig_active)
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::setInputTriggerActive(" << (int)in_input_trig_active << ")";
+
+    DCAMERR  err ;
+    int      active;
+
+    switch(in_input_trig_active)
+    {
+        case Input_Trigger_Active_Edge :
+            active = DCAMPROP_TRIGGERACTIVE__EDGE;
+            break;
+        case Input_Trigger_Active_Level:
+            active = DCAMPROP_TRIGGERACTIVE__LEVEL;
+            break;
+        case Input_Trigger_Active_SyncReadout:
+            active = DCAMPROP_TRIGGERACTIVE__SYNCREADOUT;
+            break;
+        default:
+        {
+            manage_error( deb,  "Unknown Input trigger Active set value",
+                                DCAMERR_NONE, 
+                                "",
+                                "in_input_trig_active is unknown %d",
+                                static_cast<int>(in_input_trig_active));
+
+            THROW_HW_ERROR(Error) << "Unable to set the Input trigger Active.";
+        }
+    }
+
+    // set the active
+    err = dcamprop_setvalue( m_camera_handle, DCAM_IDPROP_TRIGGERACTIVE, static_cast<double>(active) );
+    if( failed(err) )
+    {
+		manage_trace( deb, "Unable to set the Input trigger active",
+							err, 
+						   "dcamprop_setvalue",
+						   "DCAM_IDPROP_TRIGGERACTIVE %d",
+						   active);
+        THROW_HW_ERROR(Error) << "Unable to set the Input trigger active.";
+    }
+}
+
+//=============================================================================
+// INPUT TRIGGER POLARITY
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the input trigger polarity of given channel by the current detector
+//-----------------------------------------------------------------------------
+enum Camera::Input_Trigger_Polarity Camera::getInputTriggerPolarity()
+{
+    DEB_MEMBER_FUNCT();
+
+    DCAMERR err;
+    enum Input_Trigger_Polarity polarity = Camera::Input_Trigger_Polarity_Not_Supported;
+
+	//Get the channel kind value
+	double tmp = 99;
+	err = dcamprop_getvalue(m_camera_handle, DCAM_IDPROP_TRIGGERPOLARITY, &tmp);
+	if(!failed(err))
+	{                
+		int32 value = static_cast<int32>(tmp);
+		switch(value) 
+		{
+			case DCAMPROP_TRIGGERPOLARITY__NEGATIVE : polarity = Camera::Input_Trigger_Polarity_Negative ; break;
+			case DCAMPROP_TRIGGERPOLARITY__POSITIVE : polarity = Camera::Input_Trigger_Polarity_Positive ; break;
+			default: break; // result will be Input_Trigger_Active_Not_Supported
+		}
+	} //else TODO
+    
+    return polarity;
+}
+
+//-----------------------------------------------------------------------------
+/// Set the input trigger polarity of given channel by the current detector
+//-----------------------------------------------------------------------------
+void Camera::setInputTriggerPolarity(enum Input_Trigger_Polarity in_input_trig_polarity)
+{
+    DEB_MEMBER_FUNCT();
+    DEB_TRACE() << "Camera::setInputTriggerPolarity(" << (int)in_input_trig_polarity << ")";
+
+    DCAMERR  err ;
+    int      polarity;
+
+    switch(in_input_trig_polarity)
+    {
+        case Input_Trigger_Polarity_Negative :
+            polarity = DCAMPROP_TRIGGERPOLARITY__NEGATIVE;
+            break;
+        case Input_Trigger_Polarity_Positive:
+            polarity = DCAMPROP_TRIGGERPOLARITY__POSITIVE;
+            break;
+        default:
+        {
+            manage_error( deb,  "Unknown Input trigger Polarity set value",
+                                DCAMERR_NONE, 
+                                "",
+                                "in_input_trig_polarity is unknown %d",
+                                static_cast<int>(in_input_trig_polarity));
+
+            THROW_HW_ERROR(Error) << "Unable to set the Input trigger Polarity";
+        }
+    }
+
+    //Compute property ID for given channel
+	int32 property_id = DCAM_IDPROP_TRIGGERPOLARITY;
+
+    // set the polarity
+    err = dcamprop_setvalue( m_camera_handle, property_id, static_cast<double>(polarity) );
+    if( failed(err) )
+    {
+		manage_trace( deb, "Unable to set the Input trigger polarity",
+							err, 
+						   "dcamprop_setvalue",
+						   "DCAM_IDPROP_TRIGGERPOLARITY %d",
+						   polarity);
+        THROW_HW_ERROR(Error) << "Unable to set the Input trigger Polarity";
+    }
+}
+
+//=============================================================================
+// OUTPUT TRIGGER DELAY
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the output trigger delay of given channel by the current detector
+//-----------------------------------------------------------------------------
+double Camera::getOutputTriggerDelay(int channel)
+{
+    DEB_MEMBER_FUNCT();
+
+    //DEB_TRACE() << " Camera::Output_Trigger_Delay Camera::getOutputTriggerDelay(int channel) : ..."; 
+
+    DCAMERR err;
+    double delayArraySize = 0;
+    double delay = 0.0;
+
+    // get property attribute that contains the Delay (that may be an array)
+    DCAMPROP_ATTR    basepropattr;
+    memset(&basepropattr, 0, sizeof(basepropattr));
+    basepropattr.cbSize = sizeof(basepropattr);
+    basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_DELAY;
+	
+    err = dcamprop_getattr(m_camera_handle, &basepropattr);
+    if( failed(err) )
+    {
+        manage_trace( deb, "Unable to retrieve the output trigger delay attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_DELAY");
+        THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger delay attribute";
+    }    
+    else
+    {
+        //Get the ARRAYELEMENT size to ensure that the given channel is reachable
+        err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &delayArraySize);
+		//DEB_TRACE() << "NumberOfElement = " << basepropattr.iProp_NumberOfElement << ", delayArraySize = " << delayArraySize;
+        if (!failed(err) && channel < delayArraySize)
+        {
+            //Get the channel delay value
+            double tmp = 99;
+            err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
+            if(!failed(err))
+            {
+                delay = tmp;
+            } //else TODO
+        }
+    }
+    
+    return delay;
+}
+
+//=============================================================================
+// OUTPUT TRIGGER SOURCE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Return the output trigger source of given channel by the current detector
+//-----------------------------------------------------------------------------
+enum Camera::Output_Trigger_Source Camera::getOutputTriggerSource(int channel)
+{
+    DEB_MEMBER_FUNCT();
+
+    //DEB_TRACE() << " Camera::Output_Trigger_Source Camera::getOutputTriggerSource(int channel) : ..."; 
+
+    DCAMERR err;
+    double sourceArraySize = 0;
+    enum Output_Trigger_Source result = Camera::Output_Trigger_Source_Not_Supported;
+
+    // get property attribute that contains the Kind (that may be an array)
+    DCAMPROP_ATTR    basepropattr;
+    memset(&basepropattr, 0, sizeof(basepropattr));
+    basepropattr.cbSize = sizeof(basepropattr);
+    basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_SOURCE;
+	
+    err = dcamprop_getattr(m_camera_handle, &basepropattr);
+    if( failed(err) )
+    {
+        manage_trace( deb, "Unable to retrieve the output trigger source attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_SOURCE");
+        THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger source attribute";
+    }    
+    else
+    {
+        //Get the ARRAYELEMENT size to ensure that the given channel is reachable
+        err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &sourceArraySize);
+		//DEB_TRACE() << "NumberOfElement = " << basepropattr.iProp_NumberOfElement << ", sourceArraySize = " << sourceArraySize;		
+        if (!failed(err) && channel < sourceArraySize)
+        {
+            //Get the channel kind value
+            double tmp = 99;
+            err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
+            if(!failed(err))
+            {                
+                int32 casted_val = static_cast<int32>(tmp);
+                switch(casted_val) 
+                {
+                    case DCAMPROP_OUTPUTTRIGGER_SOURCE__EXPOSURE   : result = Camera::Output_Trigger_Source_Global_Exposure ; break;
+                    case DCAMPROP_OUTPUTTRIGGER_SOURCE__READOUTEND : result = Camera::Output_Trigger_Source_Readout_End     ; break;
+                    case DCAMPROP_OUTPUTTRIGGER_SOURCE__VSYNC      : result = Camera::Output_Trigger_Source_VSync           ; break;
+                    case DCAMPROP_OUTPUTTRIGGER_SOURCE__HSYNC      : result = Camera::Output_Trigger_Source_HSync           ; break;
+                    case DCAMPROP_OUTPUTTRIGGER_SOURCE__TRIGGER    : result = Camera::Output_Trigger_Source_Trigger         ; break;
+                    default: break; // result will be Output_Trigger_Source_Not_Supported
+                }
+				//DEB_TRACE() << "getOutputTriggerSource(" << channel+1 << ") : tmp=" << tmp << " => source=" << source;
+            } 
+			else
+			{
+				manage_trace( deb, "TRIGGER SOURCE - dcamprop_getvalue : Unable to retrieve the output trigger source attribute", err, "");
+			}
+        }
+		else if (failed(err))
+		{
+			DEB_TRACE() << "TRIGGER SOURCE - dcamprop_getvalue : Condition channel[" << channel << "] < sourceArraySize[" << sourceArraySize << "] not satisfied";
+		}
+    }
+    
+    return result;
+}
+
 //=============================================================================
 // OUTPUT TRIGGER KIND
 //=============================================================================
@@ -3166,7 +3825,7 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
 {
     DEB_MEMBER_FUNCT();
 
-    DEB_TRACE() << " Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel) : ..."; 
+    //DEB_TRACE() << " Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel) : ..."; 
 
     DCAMERR err;
     double kindArraySize = 0;
@@ -3177,31 +3836,26 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
     memset(&basepropattr, 0, sizeof(basepropattr));
     basepropattr.cbSize = sizeof(basepropattr);
     basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_KIND;
+	
     err = dcamprop_getattr(m_camera_handle, &basepropattr);
-
     if( failed(err) )
     {
         manage_trace( deb, "Unable to retrieve the output trigger kind attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_KIND");
-
-        if((err != DCAMERR_INVALIDPROPERTYID) && (err != DCAMERR_NOTSUPPORT))
-        {
-            THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger kind attribute";
-        }
+        THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger kind attribute";
     }    
     else
     {
         //Get the ARRAYELEMENT size to ensure that the given channel is reachable
         err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &kindArraySize);
+		//DEB_TRACE() << "NumberOfElement = " << basepropattr.iProp_NumberOfElement << ", kindArraySize = " << kindArraySize;		
         if (!failed(err) && channel < kindArraySize)
         {
             //Get the channel kind value
             double tmp = 99;
             err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
-
             if(!failed(err))
             {                
                 int32 value = static_cast<int32>(tmp);
-
                 switch(value) 
                 {
                     case DCAMPROP_OUTPUTTRIGGER_KIND__LOW              : kind = Camera::Output_Trigger_Kind_Low             ; break;
@@ -3210,7 +3864,6 @@ enum Camera::Output_Trigger_Kind Camera::getOutputTriggerKind(int channel)
                     case DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY     : kind = Camera::Output_Trigger_Kind_TriggerReady    ; break;
                     case DCAMPROP_OUTPUTTRIGGER_KIND__HIGH             : kind = Camera::Output_Trigger_Kind_High            ; break;
                     default: break; // result will be Output_Trigger_Kind_Not_Supported
-
                 }
             } //else TODO
         }
@@ -3229,7 +3882,7 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
 {
     DEB_MEMBER_FUNCT();
 
-    DEB_TRACE() << "Camera::getOutputTriggerPolarity(int channel) : channel = " << channel;
+    //DEB_TRACE() << "Camera::getOutputTriggerPolarity(int channel) : channel = " << channel;
 
     DCAMERR err;
     double polarityArraySize = 0;
@@ -3242,31 +3895,26 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
     basepropattr.iProp = DCAM_IDPROP_OUTPUTTRIGGER_POLARITY;
     err = dcamprop_getattr(m_camera_handle, &basepropattr);
 
-    DEB_TRACE() << " Camera::getOutputTriggerPolarity(int channel) : get property attribute done";
+    //DEB_TRACE() << " Camera::getOutputTriggerPolarity(int channel) : get property attribute done";
 
     if (failed(err))
     {
         manage_trace(deb, "Unable to retrieve the output trigger kind attribute", err, "dcamprop_getattr - DCAM_IDPROP_OUTPUTTRIGGER_KIND");
-
-        if ((err != DCAMERR_INVALIDPROPERTYID) && (err != DCAMERR_NOTSUPPORT))
-        {
-            THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger kind attribute";
-        }
+        THROW_HW_ERROR(Error) << "Unable to retrieve the output trigger kind attribute";
     }
     else
     {
         //Get the ARRAYELEMENT size to ensure that the given channel is reachable
         err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp_NumberOfElement, &polarityArraySize);
+		//DEB_TRACE() << "NumberOfElement = " << basepropattr.iProp_NumberOfElement << ", polarityArraySize = " << polarityArraySize;		
         if (!failed(err) && channel < polarityArraySize)
         {
             //Get the channel polarity value
             double tmp = 99;
             err = dcamprop_getvalue(m_camera_handle, basepropattr.iProp + channel * basepropattr.iPropStep_Element, &tmp);
-
             if (!failed(err))
             {
                 int32 value = static_cast<int32>(tmp);
-
                 switch (value)
                 {
                 case DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE:
@@ -3286,6 +3934,116 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
 }
 
 //=============================================================================
+// OUTPUT TRIGGER DELAY
+//=============================================================================
+//-----------------------------------------------------------------------------
+// Set the output trigger delay of given channel by the current detector
+// This property allows you to specify the delay of output trigger if DCAM_IDPROP_OUTPUTTRIGGER_ACTIVE is set to "EDGE".
+// Control is leaved to device to check the value.
+//-----------------------------------------------------------------------------
+void Camera::setOutputTriggerDelay(int channel, double in_output_trig_delay)
+{
+    DEB_MEMBER_FUNCT();
+    //DEB_PARAM() << DEB_VAR1(in_output_trig_delay);
+    DEB_TRACE() << "Camera::setOutputTriggerKind(Channel=" << channel+1 << ", value=" << (int)in_output_trig_delay << ")";
+
+    DCAMERR  err ;
+
+    //Compute property ID for given channel
+    int32 property_id = 0;
+    int32 array_base = 0;
+    int32 step_element = 0;
+
+    getPropertyData(DCAM_IDPROP_OUTPUTTRIGGER_DELAY, array_base, step_element);
+	//DEB_TRACE() << "array_base = " << array_base << ", step_element = " << step_element;
+    property_id = array_base + step_element * channel;
+
+    // set the kind
+    err = dcamprop_setvalue( m_camera_handle, property_id, in_output_trig_delay );
+    if( failed(err) )
+    {
+		manage_trace( deb, "Unable to set the Output trigger Delay",
+					err, 
+				   "dcamprop_setvalue",
+				   "DCAM_IDPROP_OUTPUTTRIGGER_DELAY[%d] %d",
+				   channel+1,
+				   in_output_trig_delay);
+        THROW_HW_ERROR(Error) << "Unable to set the Output trigger delay";
+
+    }
+}
+
+//=============================================================================
+// OUTPUT TRIGGER SOURCE
+//=============================================================================
+//-----------------------------------------------------------------------------
+/// Set the output trigger source of given channel by the current detector
+//-----------------------------------------------------------------------------
+void Camera::setOutputTriggerSource(int channel, enum Output_Trigger_Source in_output_trig_source, bool raise_ex)
+{
+    DEB_MEMBER_FUNCT();
+    //DEB_PARAM() << DEB_VAR1(in_output_trig_source);
+    DEB_TRACE() << "Camera::setOutputTriggerSource(Channel=" << channel+1 << ", value=" << (int)in_output_trig_source << ")";
+
+    DCAMERR  err ;
+    int      source;
+
+    switch(in_output_trig_source)
+    {
+        case Output_Trigger_Source_Global_Exposure :
+            source = DCAMPROP_OUTPUTTRIGGER_SOURCE__EXPOSURE;
+            break;
+        case Output_Trigger_Source_Readout_End:
+            source = DCAMPROP_OUTPUTTRIGGER_SOURCE__READOUTEND;
+            break;
+        case Output_Trigger_Source_VSync:
+            source = DCAMPROP_OUTPUTTRIGGER_SOURCE__VSYNC;
+            break;
+        case Output_Trigger_Source_HSync:
+            source = DCAMPROP_OUTPUTTRIGGER_SOURCE__HSYNC;
+            break;
+        case Output_Trigger_Source_Trigger:
+            source = DCAMPROP_OUTPUTTRIGGER_SOURCE__TRIGGER;
+            break;
+        default:
+        {
+            manage_error( deb,  "Unknown Output trigger Source set value",
+                                DCAMERR_NONE, 
+                                "",
+                                "in_output_trig_source is unknown %d",
+                                static_cast<int>(in_output_trig_source));
+
+            THROW_HW_ERROR(Error) << "Unable to set the Output trigger source";
+        }
+    }
+
+    //Compute property ID for given channel
+    int32 property_id = 0;
+    int32 array_base = 0;
+    int32 step_element = 0;
+
+    getPropertyData(DCAM_IDPROP_OUTPUTTRIGGER_SOURCE, array_base, step_element);
+	//DEB_TRACE() << "array_base = " << array_base << ", step_element = " << step_element;
+    property_id = array_base + step_element * channel;
+
+    // set the kind
+    err = dcamprop_setvalue( m_camera_handle, property_id, static_cast<double>(source) );
+    if( failed(err) )
+    {
+		manage_trace( deb, "Unable to set the Output trigger source",
+							err, 
+						   "dcamprop_setvalue",
+						   "DCAM_IDPROP_OUTPUTTRIGGER_SOURCE[%d] %d",
+						   channel+1,
+						   source);
+		if (err == DCAMERR_INVALIDVALUE && raise_ex)
+		{
+			THROW_HW_ERROR(Error) << "Unable to set the Output trigger source";
+		}
+    }
+}
+
+//=============================================================================
 // OUTPUT TRIGGER KIND
 //=============================================================================
 //-----------------------------------------------------------------------------
@@ -3294,9 +4052,8 @@ enum Camera::Output_Trigger_Polarity Camera::getOutputTriggerPolarity(int channe
 void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_output_trig_kind)
 {
     DEB_MEMBER_FUNCT();
-    DEB_PARAM() << DEB_VAR1(in_output_trig_kind);
-
-    DEB_TRACE() << "Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_output_trig_kind)";
+    //DEB_PARAM() << DEB_VAR1(in_output_trig_kind);
+    DEB_TRACE() << "Camera::setOutputTriggerKind(Channel=" << channel+1 << ", value=" << (int)in_output_trig_kind << ")";
 
     DCAMERR  err ;
     int      kind;
@@ -3327,7 +4084,7 @@ void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_outpu
     }
     else
     {
-        manage_error( deb,  "Unable to set the Output trigger Kind",
+        manage_error( deb,  "Unknown Output trigger Kind set value",
                             DCAMERR_NONE, 
                             "",
                             "in_output_trig_kind is unknown %d",
@@ -3342,25 +4099,21 @@ void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_outpu
     int32 step_element = 0;
 
     getPropertyData(DCAM_IDPROP_OUTPUTTRIGGER_KIND, array_base, step_element);
-
+	//DEB_TRACE() << "array_base = " << array_base << ", step_element = " << step_element;
     property_id = array_base + step_element * channel;
 
     // set the kind
     err = dcamprop_setvalue( m_camera_handle,property_id , static_cast<double>(kind) );
-
     if( failed(err) )
     {
-        if((err == DCAMERR_INVALIDPROPERTYID) || (err == DCAMERR_NOTSUPPORT))
-        {
-            manage_trace( deb, "Unable to set the Output trigger Kind",
-                                err, 
-                               "dcamprop_setvalue",
-                               "DCAM_IDPROP_OUTPUTTRIGGER_KIND[%d] %d",
-                               channel,
-                               kind);
+		manage_trace( deb, "Unable to set the Output trigger Kind",
+						   err, 
+						   "dcamprop_setvalue",
+						   "DCAM_IDPROP_OUTPUTTRIGGER_KIND[%d] %d",
+						   channel+1,
+						   kind);
+        THROW_HW_ERROR(Error) << "Unable to set the Output trigger Kind";
 
-            THROW_HW_ERROR(Error) << "Unable to set the Output trigger Kind";
-        }
     }
 }
 
@@ -3373,8 +4126,8 @@ void Camera::setOutputTriggerKind(int channel, enum Output_Trigger_Kind in_outpu
 void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigger_Polarity in_output_trig_polarity)
 {
     DEB_MEMBER_FUNCT();
-    DEB_TRACE() << "Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigger_Polarity in_output_trig_polarity) : ...";
-    DEB_PARAM() << DEB_VAR1(in_output_trig_polarity);
+    DEB_TRACE() << "Camera::setOutputTriggerPolarity(Channel=" << in_channel+1 << ", value=" << (int)in_output_trig_polarity << ")";
+    //DEB_PARAM() << DEB_VAR1(in_output_trig_polarity);
 
     DCAMERR err;
     int     polarity;
@@ -3389,7 +4142,7 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
     }
     else
     {
-        manage_error( deb,  "Unable to set the Output trigger Polarity", 
+        manage_error( deb,  "Unknown Output trigger Polarity set value", 
                             DCAMERR_NONE, 
                             "",
                             "in_output_trig_polarity is unknown %d",
@@ -3404,25 +4157,20 @@ void Camera::setOutputTriggerPolarity(int in_channel, enum Camera::Output_Trigge
     int32 step_element = 0;
 
     getPropertyData(DCAM_IDPROP_OUTPUTTRIGGER_POLARITY, array_base, step_element);
-
+	//DEB_TRACE() << "array_base = " << array_base << ", step_element = " << step_element;
     property_id = array_base + step_element * in_channel;
 
     //set the polarity
     err = dcamprop_setvalue(m_camera_handle, property_id, static_cast<double>(polarity) );
-
-     if( failed(err) )
+    if( failed(err) )
     {
-        if((err == DCAMERR_INVALIDPROPERTYID) || (err == DCAMERR_NOTSUPPORT))
-        {
-            manage_trace( deb, "Unable to set the Output trigger Polarity", 
-                                err, 
-                                "dcamprop_setvalue",
-                                "DCAM_IDPROP_OUTPUTTRIGGER_POLARITY[%d] %d", 
-                                in_channel,
-                                polarity);
-
-            THROW_HW_ERROR(Error) << "Unable to set the Output trigger Polarity";
-        }
+		manage_trace( deb, "Unable to set the Output trigger Polarity", 
+							err, 
+							"dcamprop_setvalue",
+							"DCAM_IDPROP_OUTPUTTRIGGER_POLARITY[%d] %d", 
+							in_channel+1,
+							polarity);
+        THROW_HW_ERROR(Error) << "Unable to set the Output trigger Polarity";
     }
 }
 

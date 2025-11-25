@@ -58,6 +58,44 @@ namespace lima
 {
     namespace Hamamatsu
     {
+    /* 
+	// Refactoring
+	struct TRIGGER
+	{
+        enum TYPE
+	    {
+		    INPUT=0,
+		    OUTPUT=1
+	    }
+        enum IDSTR
+	    {
+		    ACTIVE=0,
+            DELAY,
+            KIND,
+            POLARITY,
+		    SOURCE
+	    }
+
+		TRIGGER::TYPE type;
+        TRIGGER::IDSTR id,
+		char[32] desc;
+
+		TRIGGER(TRIGGER::TYPE arg_type, TRIGGER::IDSTR arg_id, char* arg_desc)
+		{
+			type = arg_type;
+            id = arg_id;
+			strcpy(desc, arg_desc);
+		}
+	}
+
+    #define INPUT_TRIGGER_ACTIVE    TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::IDSTR::ACTIVE, "Active")
+    #define INPUT_TRIGGER_POLARITY  TRIGGER(TRIGGER::TYPE::INPUT, TRIGGER::IDSTR::POLARITY, "Polarity")
+
+    #define OUTPUT_TRIGGER_DELAY    TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::DELAY, "Delay")
+    #define OUTPUT_TRIGGER_SOURCE   TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::SOURCE, "Source")
+    #define OUTPUT_TRIGGER_KIND     TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::KIND, "Kind")
+    #define OUTPUT_TRIGGER_POLARITY TRIGGER(TRIGGER::TYPE::OUTPUT, TRIGGER::IDSTR::POLARITY, "Polarity")
+    */
 
 /*******************************************************************
  * \class Camera
@@ -123,6 +161,54 @@ namespace lima
             Cooler_Status_Warning      , // DCAMPROP_SENSORCOOLERSTATUS__WARNING
         };
 
+        // Sensor Mode
+        enum Sensor_Mode
+        {
+            Sensor_Mode_Not_Supported = 0,
+            Sensor_Mode_Area            , // DCAMPROP_SENSORMODE__AREA
+            Sensor_Mode_Line            , // DCAMPROP_SENSORMODE__LINE
+            Sensor_Mode_TDI             , // DCAMPROP_SENSORMODE__TDI
+            Sensor_Mode_TDI_Extented    , // DCAMPROP_SENSORMODE__TDI_EXTENDED
+            Sensor_Mode_Progressive     , // DCAMPROP_SENSORMODE__PROGRESSIVE
+        };
+
+        // Pixel Type
+        enum Pixel_Type
+        {
+			Pixel_Type_Not_Supported = 0,
+            Pixel_Type_Mono8    , // DCAM_PIXELTYPE_MONO8
+            Pixel_Type_Mono16   , // DCAM_PIXELTYPE_MONO16
+			Pixel_Type_RGB24    , // DCAM_PIXELTYPE_RGB24
+			Pixel_Type_RGB48    , // DCAM_PIXELTYPE_RGB48
+            Pixel_Type_BGR24    , // DCAM_PIXELTYPE_BGR24
+            Pixel_Type_BGR48 	  // DCAM_PIXELTYPE_BGR48
+        };
+
+        // Scan Mode
+        enum Scan_Mode
+        {
+            Scan_Mode_Not_Supported = 0   ,
+            Scan_Mode_Ultra_Quiet         , // DCAMPROP_READOUTSPEED__SLOWEST
+            Scan_Mode_Standard            , // DCAMPROP_READOUTSPEED__FASTEST
+        };
+
+        // relative to DCAM_IDPROP_TRIGGER_ACTIVE
+        enum Input_Trigger_Active
+        {
+            Input_Trigger_Active_Not_Supported  ,
+            Input_Trigger_Active_Edge           , // DCAMPROP_TRIGGERACTIVE__EDGE			
+            Input_Trigger_Active_Level          , // DCAMPROP_TRIGGERACTIVE__LEVEL		
+            Input_Trigger_Active_SyncReadout      // DCAMPROP_TRIGGERACTIVE__SYNCREADOUT	
+        };
+
+        // relative to DCAM_IDPROP_TRIGGER_POLARITY
+        enum Input_Trigger_Polarity
+        {
+            Input_Trigger_Polarity_Not_Supported  ,
+            Input_Trigger_Polarity_Negative       , // DCAMPROP_TRIGGERPOLARITY__NEGATIVE			
+            Input_Trigger_Polarity_Positive         // DCAMPROP_TRIGGERPOLARITY__POSITIVE		
+        };
+
         // relative to DCAM_IDPROP_OUTPUTTRIGGER_KIND
         enum Output_Trigger_Kind
         {
@@ -131,7 +217,7 @@ namespace lima
             Output_Trigger_Kind_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_KIND__EXPOSURE		
             Output_Trigger_Kind_Programmable        , // DCAMPROP_OUTPUTTRIGGER_KIND__PROGRAMABLE	
             Output_Trigger_Kind_TriggerReady        , // DCAMPROP_OUTPUTTRIGGER_KIND__TRIGGERREADY	
-            Output_Trigger_Kind_High                , // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			//Not yet available with current SDK
+            Output_Trigger_Kind_High                  // DCAMPROP_OUTPUTTRIGGER_KIND__HIGH			//Not yet available with current SDK
 
         };
 
@@ -139,8 +225,19 @@ namespace lima
         enum Output_Trigger_Polarity
         {
             Output_Trigger_Polarity_Not_Supported, 
-            Output_Trigger_Polarity_Negative, // DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE
-            Output_Trigger_Polarity_Positive, // DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE
+            Output_Trigger_Polarity_Negative     , // DCAMPROP_OUTPUTTRIGGER_POLARITY__NEGATIVE
+            Output_Trigger_Polarity_Positive      // DCAMPROP_OUTPUTTRIGGER_POLARITY__POSITIVE
+        };
+
+        // relative to DCAM_IDPROP_OUTPUTTRIGGER_KIND
+        enum Output_Trigger_Source
+        {
+            Output_Trigger_Source_Not_Supported       ,
+            Output_Trigger_Source_Global_Exposure     , // DCAMPROP_OUTPUTTRIGGER_SOURCE__EXPOSURE			
+            Output_Trigger_Source_Readout_End         , // DCAMPROP_OUTPUTTRIGGER_SOURCE__READOUTEND		
+            Output_Trigger_Source_VSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__VSYNC	
+            Output_Trigger_Source_HSync               , // DCAMPROP_OUTPUTTRIGGER_SOURCE__HSYNC	
+            Output_Trigger_Source_Trigger               // DCAMPROP_OUTPUTTRIGGER_SOURCE__TRIGGER			// Aavailable with ORCA QUEST
         };
 
 	//-----------------------------------------------------------------------------
@@ -229,13 +326,43 @@ namespace lima
         void setViewMode(bool in_view_mode_activated,  ///< [in] view mode activation or not
                          int  in_views_number       ); ///< [in] number of views if view mode activated
 
-        //-- Output Triggers  control
-        void setOutputTriggerKind    (int channel,                                                   ///< [in] channel to set
-                                      enum Camera::Output_Trigger_Kind in_output_trig_kind);                 ///< [in] kind of the channel to set
-        void setOutputTriggerPolarity(int in_channel,                                                ///< [in] the channel to set
-                                      enum Camera::Output_Trigger_Polarity in_output_trig_polarity); ///< [in] polarity of the channel to set
-        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel); ///< [in] channel to get
+        // ICATHALES-587
+        // Refactoring
+        //int getChannelTrigger(int channel, TRIGGER trigger);
+        //void setChannelTrigger(int channel, int trigger_enum, TRIGGER trigger);
+
+        // ICATHALES-587
+		// Get number of channels
+		long getNbMaxChannels(int32 idProp=-1);
+		
+        //-- Input Triggers  control is channel independant
+        enum Camera::Input_Trigger_Active getInputTriggerActive(); ///< [in] channel to get
+        enum Camera::Input_Trigger_Polarity getInputTriggerPolarity(); ///< [in] channel to get
+
+        void setInputTriggerActive(enum Input_Trigger_Active in_input_trig_active);
+        void setInputTriggerPolarity(enum Input_Trigger_Polarity in_input_trig_polarity);
+
+        //-- Output Triggers  control is channel dependant
+        void setOutputTriggerDelay(int channel,                                                         ///< [in] channel to set
+                                   double in_output_trig_delay);                                        ///< [in] delay of the channel to set
+        void setOutputTriggerKind(int channel,                                                          ///< [in] channel to set
+                                  enum Camera::Output_Trigger_Kind in_output_trig_kind);                ///< [in] kind of the channel to set
+        void setOutputTriggerSource(int in_channel,                                                     ///< [in] the channel to set
+                                    enum Camera::Output_Trigger_Source in_output_trig_source, bool raise_ex=true);          ///< [in] source of the channel to set
+        void setOutputTriggerPolarity(int in_channel,                                                   ///< [in] the channel to set
+                                      enum Camera::Output_Trigger_Polarity in_output_trig_polarity);    ///< [in] polarity of the channel to set
+
+        double getOutputTriggerDelay(int channel);                                  ///< [in] channel to get
+        enum Camera::Output_Trigger_Kind getOutputTriggerKind(int channel);         ///< [in] channel to get
+        enum Camera::Output_Trigger_Source getOutputTriggerSource(int channel);     ///< [in] channel to get
         enum Camera::Output_Trigger_Polarity getOutputTriggerPolarity(int channel); ///< [in] channel to get
+
+        // Sensor Mode
+        enum Camera::Sensor_Mode getSensorMode(); ///< [in] channel to get
+        void setSensorMode(enum Sensor_Mode in_sensor_mode);
+		
+		enum Camera::Pixel_Type getPixelType();
+		void setPixelType(enum Pixel_Type in_pixel_type);
 
         void traceAllRoi(void);
         void checkingROIproperties(void);
@@ -284,7 +411,12 @@ namespace lima
         void initParametersMap();
         void mapIdParameter(int32 parameter_id);
 
+		bool isOrcaQuest();
+		
 	private:
+        void initDetectorModel();
+        void initialiseOrcaQuest();
+
         enum Camera::Cooler_Mode getCoolerMode(void);
         std::string getCoolerModeLabelFromMode(enum Camera::Cooler_Mode in_cooler_mode);
 
