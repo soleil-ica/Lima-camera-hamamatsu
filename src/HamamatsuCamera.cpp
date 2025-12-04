@@ -95,6 +95,7 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
       m_fasttrigger    (0)    ,
       m_exp_time       (1.)   ,
       m_read_mode      (2)    ,
+      m_sensor_mode    (1)    ,
       m_lost_frames_count(0)  ,
       m_fps            (0.0)  ,
       m_hdr_enabled    (false),
@@ -1306,6 +1307,11 @@ void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readou
     DEB_MEMBER_FUNCT();
     DEB_PARAM() << DEB_VAR1(readout_speed);
 
+    if( getSensorModeLabelFromValue(m_sensor_mode) != SENSORMODE_AREA_NAME )
+    {
+        THROW_HW_ERROR(Error) << "readoutSpeed can only be changed if sensorMode is AREA";
+    }
+
     DCAMERR err;
 
     // set the readout speed
@@ -1469,7 +1475,7 @@ void Camera::setSensorMode(const short int sensor_mode) ///< [in] new sensor mod
         THROW_HW_ERROR(Error) << "Failed to set sensor mode";
     }
 
-    m_read_mode = sensor_mode;
+    m_sensor_mode = sensor_mode;
 }
 
 //-----------------------------------------------------------------------------
@@ -1480,7 +1486,7 @@ short int Camera::getSensorMode(void) const
     DEB_MEMBER_FUNCT();
 
     DCAMERR err   ;
-    int32   read_mode = 0  ;
+    int32   sensor_mode = 0  ;
     double  v  =   0.0;
 
     err = dcamprop_getvalue( m_camera_handle, DCAM_IDPROP_SENSORMODE, &v );
@@ -1491,12 +1497,12 @@ short int Camera::getSensorMode(void) const
     }
     else    
     {
-        read_mode = static_cast<int32>(v);
+        sensor_mode = static_cast<int32>(v);
     }
 
-    DEB_TRACE() << DEB_VAR1(read_mode);
+    DEB_TRACE() << DEB_VAR1(sensor_mode);
 
-    return  read_mode;
+    return  sensor_mode;
 }
 
 //-----------------------------------------------------------------------------
