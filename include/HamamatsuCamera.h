@@ -563,6 +563,7 @@ namespace lima
 	    bool                        m_fasttrigger        ; // ?
 	    int                         m_temperature_sp     ;   
 	    int                         m_read_mode          ;
+	    int                         m_sensor_mode        ;
 	    int                         m_acq_mode           ;  
 	    double                      m_exp_time           ;
 	    double                      m_exp_time_max       ;
