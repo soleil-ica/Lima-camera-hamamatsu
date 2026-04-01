@@ -70,13 +70,18 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 
 #define READOUTSPEED_SLOW_VALUE     1
 #define READOUTSPEED_NORMAL_VALUE   2
+#define READOUTSPEED_FAST_VALUE     3
 #define READOUTSPEED_SLOW_NAME      "ULTRA QUIET"
 #define READOUTSPEED_NORMAL_NAME    "STANDARD"
+#define READOUTSPEED_FAST_NAME      "FAST"
 
 #define SENSORMODE_AREA_VALUE           1
 #define SENSORMODE_PROGRESSIVE_VALUE    12
 #define SENSORMODE_AREA_NAME            "AREA"
 #define SENSORMODE_PROGRESSIVE_NAME     "PROGRESSIVE"
+
+#define DETECTOR_MODEL_QUEST        "C15550-20UP"
+#define DETECTOR_MODEL_FUSION       "C15440-20UP"
 
 //-----------------------------------------------------------------------------
 ///  Ctor
@@ -1299,7 +1304,10 @@ bool Camera::isReadoutSpeedSupported(void)
 //-----------------------------------------------------------------------------
 /// Set the readout speed value
 /*!
-@remark possible values are 1 or 2
+@remark possible values are :
+    - 1 (ULTRA QUIET)
+    - 2 (STANDARD)
+    - 3 (FAST, Orca Quest only)
 */
 //-----------------------------------------------------------------------------
 void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readout speed
@@ -1310,6 +1318,21 @@ void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readou
     if( getSensorModeLabelFromValue(m_sensor_mode) != SENSORMODE_AREA_NAME )
     {
         THROW_HW_ERROR(Error) << "readoutSpeed can only be changed if sensorMode is AREA";
+    }
+
+    if (readout_speed != READOUTSPEED_NORMAL_VALUE
+        && readout_speed != READOUTSPEED_SLOW_VALUE
+        && readout_speed != READOUTSPEED_FAST_VALUE)
+    {
+        THROW_HW_ERROR(Error) << "Unknown readoutSpeed value";
+    }
+
+    string detector_model;
+    getDetectorModel(detector_model);
+
+    if (readout_speed == READOUTSPEED_FAST_VALUE && detector_model != DETECTOR_MODEL_FUSION)
+    {
+        THROW_HW_ERROR(Error) << "readoutSpeed can only be set to FAST for Orca Fusion detectors";
     }
 
     DCAMERR err;
@@ -1364,6 +1387,7 @@ std::string Camera::getReadoutSpeedLabelFromValue(const short int in_readout_spe
     {
         case READOUTSPEED_SLOW_VALUE  : label = READOUTSPEED_SLOW_NAME  ; break;
         case READOUTSPEED_NORMAL_VALUE: label = READOUTSPEED_NORMAL_NAME; break;
+        case READOUTSPEED_FAST_VALUE: label = READOUTSPEED_FAST_NAME; break;
         default: label = "ERROR"; break;
     }
 
@@ -1386,15 +1410,18 @@ short int Camera::getReadoutSpeedFromLabel(const std::string & in_readout_speed_
     {
         readout_speed = READOUTSPEED_NORMAL_VALUE;
     }
-    else
-    if (label == READOUTSPEED_SLOW_NAME)
+    else if (label == READOUTSPEED_SLOW_NAME)
     {
         readout_speed = READOUTSPEED_SLOW_VALUE;
+    }
+    else if (label == READOUTSPEED_FAST_NAME)
+    {
+        readout_speed = READOUTSPEED_FAST_VALUE;
     }
     else
 	{			
 		string user_msg;
-        user_msg = string("Available Readout speeds are:\n- ") + string(READOUTSPEED_NORMAL_NAME) + string("\n- ") + string(READOUTSPEED_SLOW_NAME);
+        user_msg = string("Available Readout speeds are:\n- ") + string(READOUTSPEED_NORMAL_NAME) + string("\n- ") + string(READOUTSPEED_SLOW_NAME) + string("\n- ") + string(READOUTSPEED_FAST_NAME);
         THROW_HW_ERROR(Error) << user_msg.c_str();
 	}
 
