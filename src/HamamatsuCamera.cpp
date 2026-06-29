@@ -71,9 +71,12 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define READOUTSPEED_SLOW_VALUE     1
 #define READOUTSPEED_NORMAL_VALUE   2
 #define READOUTSPEED_FAST_VALUE     3
-#define READOUTSPEED_SLOW_NAME      "ULTRA QUIET"
-#define READOUTSPEED_NORMAL_NAME    "STANDARD"
-#define READOUTSPEED_FAST_NAME      "FAST"
+
+#define READOUTSPEED_ULTRA_QUIET      "ULTRA QUIET"
+#define READOUTSPEED_STANDARD         "STANDARD"
+#define READOUTSPEED_FAST             "FAST"
+#define READOUTSPEED_SLOW             "SLOW"
+#define READOUTSPEED_RAPID            "RAPID"
 
 #define SENSORMODE_AREA_VALUE           1
 #define SENSORMODE_PROGRESSIVE_VALUE    12
@@ -81,7 +84,44 @@ const string Camera::g_trace_little_line_separator = "--------------------------
 #define SENSORMODE_PROGRESSIVE_NAME     "PROGRESSIVE"
 
 #define DETECTOR_MODEL_QUEST        "C15550-20UP"
+#define DETECTOR_MODEL_QUEST_2      "C15550-22UP"
 #define DETECTOR_MODEL_FUSION       "C15440-20UP"
+#define DETECTOR_MODEL_FLASH4_V2    "C11440-22CU"
+#define DETECTOR_MODEL_FLASH4_V3    "C13440-20CU"
+#define DETECTOR_MODEL_FLASH_LT3    "C11440-42U40"
+#define DETECTOR_MODEL_LIGHTNING    "C14120-20P"
+
+// Mapping detector models with their corresponding labels
+static const std::vector<ReadoutSpeedRule> ReadoutSpeedRules = {
+    // Fusion BT
+    {DETECTOR_MODEL_FUSION, READOUTSPEED_SLOW_VALUE,   READOUTSPEED_ULTRA_QUIET},
+    {DETECTOR_MODEL_FUSION, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_STANDARD},
+    {DETECTOR_MODEL_FUSION, READOUTSPEED_FAST_VALUE,   READOUTSPEED_FAST},
+
+    // Quest
+    {DETECTOR_MODEL_QUEST, READOUTSPEED_SLOW_VALUE,    READOUTSPEED_ULTRA_QUIET},
+    {DETECTOR_MODEL_QUEST, READOUTSPEED_NORMAL_VALUE,  READOUTSPEED_STANDARD},
+    
+    // Quest 2
+    {DETECTOR_MODEL_QUEST_2, READOUTSPEED_SLOW_VALUE,  READOUTSPEED_ULTRA_QUIET},
+    {DETECTOR_MODEL_QUEST_2, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_STANDARD},
+
+    // Flash 4 v2
+    {DETECTOR_MODEL_FLASH4_V2, READOUTSPEED_SLOW_VALUE,  READOUTSPEED_SLOW},
+    {DETECTOR_MODEL_FLASH4_V2, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_STANDARD},
+
+    // Flash 4 v3
+    {DETECTOR_MODEL_FLASH4_V3, READOUTSPEED_SLOW_VALUE,  READOUTSPEED_SLOW},
+    {DETECTOR_MODEL_FLASH4_V3, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_STANDARD},
+
+    // Flash LT3
+    {DETECTOR_MODEL_FLASH_LT3, READOUTSPEED_SLOW_VALUE,  READOUTSPEED_STANDARD},
+    {DETECTOR_MODEL_FLASH_LT3, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_RAPID},
+
+    // Lightning
+    {DETECTOR_MODEL_LIGHTNING, READOUTSPEED_SLOW_VALUE,  READOUTSPEED_SLOW},
+    {DETECTOR_MODEL_LIGHTNING, READOUTSPEED_NORMAL_VALUE, READOUTSPEED_STANDARD}
+};
 
 //-----------------------------------------------------------------------------
 ///  Ctor
@@ -337,7 +377,7 @@ void Camera::getDetectorType(string& type) ///< [out] detector type
 //-----------------------------------------------------------------------------
 /// return the detector model
 //-----------------------------------------------------------------------------
-void Camera::getDetectorModel(string& type) ///< [out] detector model
+void Camera::getDetectorModel(string& type) const ///< [out] detector model
 {
     DEB_MEMBER_FUNCT();
     type = m_detector_model;
@@ -1381,17 +1421,17 @@ short int Camera::getReadoutSpeed(void) const
 //-----------------------------------------------------------------------------
 std::string Camera::getReadoutSpeedLabelFromValue(const short int in_readout_speed) const
 {
-    std::string label = "";
+    std::string detector_model;
+    getDetectorModel(detector_model);
 
-    switch (in_readout_speed)
+    for (const ReadoutSpeedRule& rule : ReadoutSpeedRules)
     {
-        case READOUTSPEED_SLOW_VALUE  : label = READOUTSPEED_SLOW_NAME  ; break;
-        case READOUTSPEED_NORMAL_VALUE: label = READOUTSPEED_NORMAL_NAME; break;
-        case READOUTSPEED_FAST_VALUE: label = READOUTSPEED_FAST_NAME; break;
-        default: label = "ERROR"; break;
+        if (rule.model == detector_model && rule.value == in_readout_speed)
+        {
+            return rule.label;
+        }
     }
-
-    return label;
+    return "ERROR";
 }
 
 //-----------------------------------------------------------------------------
@@ -1401,31 +1441,19 @@ short int Camera::getReadoutSpeedFromLabel(const std::string & in_readout_speed_
 {
     DEB_MEMBER_FUNCT();
 
-    short int   readout_speed = READOUTSPEED_NORMAL_VALUE;
-    std::string label         = in_readout_speed_label;
+    std::string detector_model;
+    getDetectorModel(detector_model);
 
-	transform(label.begin(), label.end(), label.begin(), ::toupper);
+    for (const ReadoutSpeedRule& rule : ReadoutSpeedRules)
+    {
+        if (rule.model == detector_model && rule.label == in_readout_speed_label)
+        {
+            return rule.value;
+        }
+    }
 
-    if (label == READOUTSPEED_NORMAL_NAME)
-    {
-        readout_speed = READOUTSPEED_NORMAL_VALUE;
-    }
-    else if (label == READOUTSPEED_SLOW_NAME)
-    {
-        readout_speed = READOUTSPEED_SLOW_VALUE;
-    }
-    else if (label == READOUTSPEED_FAST_NAME)
-    {
-        readout_speed = READOUTSPEED_FAST_VALUE;
-    }
-    else
-	{			
-		string user_msg;
-        user_msg = string("Available Readout speeds are:\n- ") + string(READOUTSPEED_NORMAL_NAME) + string("\n- ") + string(READOUTSPEED_SLOW_NAME) + string("\n- ") + string(READOUTSPEED_FAST_NAME);
-        THROW_HW_ERROR(Error) << user_msg.c_str();
-	}
-
-    return readout_speed;
+    // Default value
+    return READOUTSPEED_NORMAL_VALUE;
 }
 
 //-----------------------------------------------------------------------------
@@ -3616,4 +3644,22 @@ void Camera::mapIdParameter(int32 parameter_id)
         THROW_HW_ERROR(Error) << "Unable to get the name of the parameter";
     }
     m_map_parameters.insert({name, parameter_id});
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void Camera::getReadoutSpeedDescription(std::string& description)
+{
+    std::string detector_model;
+    getDetectorModel(detector_model);
+
+    description += "Current readout speed mode\n";
+
+    for (const ReadoutSpeedRule& rule : ReadoutSpeedRules) {
+        if (rule.model == detector_model) {
+            description += "- ";
+            description += rule.label;
+            description += "\n";
+        }
+    }
 }
