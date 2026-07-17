@@ -59,6 +59,12 @@ namespace lima
     namespace Hamamatsu
     {
 
+    struct ReadoutSpeedRule {
+        std::string model;
+        short int value;
+        std::string label;
+    };
+
 /*******************************************************************
  * \class Camera
  * \brief object controlling the Hamamatsu camera via DCAM-SDK
@@ -157,7 +163,7 @@ namespace lima
 	    void setImageType(ImageType type);
 
 	    void getDetectorType(std::string& type);
-	    void getDetectorModel(std::string& model);
+	    void getDetectorModel(std::string& model) const;
 	    void getDetectorImageSize(Size& size);
 		void getDetectorMaxImageSize(Size& size);
     
@@ -283,6 +289,8 @@ namespace lima
         //-
         void initParametersMap();
         void mapIdParameter(int32 parameter_id);
+
+        void getReadoutSpeedDescription(std::string& description);
 
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
