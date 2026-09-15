@@ -58,6 +58,7 @@ namespace lima
 {
     namespace Hamamatsu
     {
+    class SyncCtrlObj;
 
     struct ReadoutSpeedRule {
         std::string model;
@@ -291,6 +292,8 @@ namespace lima
         void mapIdParameter(int32 parameter_id);
 
         void getReadoutSpeedDescription(std::string& description);
+
+        SyncCtrlObj* m_sync;
 
 	private:
         enum Camera::Cooler_Mode getCoolerMode(void);
