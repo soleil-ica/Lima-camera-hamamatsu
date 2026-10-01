@@ -26,6 +26,7 @@
 #include <math.h>
 #include <algorithm>
 #include "HamamatsuCamera.h"
+#include "HamamatsuSyncCtrlObj.h"
 
 using namespace lima;
 using namespace lima::Hamamatsu;
@@ -160,6 +161,8 @@ Camera::Camera(const std::string& config_path, int camera_number, int frame_buff
     m_map_triggerMode[ExtTrigReadout] = "ExtTrigReadout";
     m_map_triggerMode[ExtTrigSingle ] = "ExtTrigSingle" ;
     m_map_triggerMode[ExtTrigMult   ] = "ExtTrigMult"   ;
+
+    m_sync = nullptr;
 
     DEB_TRACE() << "Starting Hamamatsu camera (DCAMAPI_VER:" << DCAMAPI_VER << ")";
 
@@ -1384,6 +1387,11 @@ void Camera::setReadoutSpeed(const short int readout_speed) ///< [in] new readou
         manage_error( deb, "Failed to set readout speed", err, 
                       "dcamprop_setvalue", "IDPROP=DCAM_IDPROP_SUBARRAYVPOS, VALUE=%d",static_cast<int>(readout_speed));
         THROW_HW_ERROR(Error) << "Failed to set readout speed";
+    }
+
+    if (m_sync)
+    {
+        m_sync->updateValidRanges();
     }
 
     m_read_mode = readout_speed;

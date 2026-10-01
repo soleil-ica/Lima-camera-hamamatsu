@@ -33,6 +33,7 @@ SyncCtrlObj::SyncCtrlObj(Camera& cam)
     : HwSyncCtrlObj(), m_cam(cam)
 {
     DEB_CONSTRUCTOR();
+    m_cam.m_sync = this;
 }
 
 //-----------------------------------------------------
@@ -139,4 +140,17 @@ void SyncCtrlObj::getValidRanges(ValidRangesType& valid_ranges)
     m_cam.getLatTimeRange(min_time, max_time);
     valid_ranges.min_lat_time = min_time;
     valid_ranges.max_lat_time = max_time;
+}
+
+//-----------------------------------------------------
+// manages the update of valid ranges
+//-----------------------------------------------------
+void SyncCtrlObj::updateValidRanges()
+{
+	DEB_MEMBER_FUNCT();
+
+    ValidRangesType valid_ranges;
+    getValidRanges(valid_ranges);
+
+    validRangesChanged(valid_ranges);
 }
